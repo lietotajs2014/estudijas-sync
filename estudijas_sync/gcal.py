@@ -29,10 +29,19 @@ def get_service(cfg: Config, interactive: bool = False):
         raise GCalNotAuthorized("Nav instalētas Google bibliotēkas: pip install -r requirements-google.txt") from e
     tok = cfg.data_dir / "google_token.json"
     creds = Credentials.from_authorized_user_file(str(tok), SCOPES) if tok.exists() else None
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+    if creds and not creds.valid and creds.expired and creds.refresh_token:
+        try:
             creds.refresh(Request())
-        elif interactive:
+            tok.write_text(creds.to_json(), encoding="utf-8")
+        except Exception as e:  # piem. invalid_grant: Testing režīmā Google atsauc piekļuvi pēc 7 dienām
+            log.warning("Google piekļuve beigusies: %s", e)
+            tok.unlink(missing_ok=True)
+            creds = None
+            if not interactive:
+                raise GCalNotAuthorized("Google Calendar savienojums beidzies (Testing režīmā tas notiek ik pēc "
+                                        "7 dienām). Panelī spied 'Savienot ar Google'.") from e
+    if not creds or not creds.valid:
+        if interactive:
             if not cfg.google_credentials.exists():
                 raise GCalNotAuthorized(f"Nav atrasts {cfg.google_credentials} (skat. README).")
             flow = InstalledAppFlow.from_client_secrets_file(str(cfg.google_credentials), SCOPES)

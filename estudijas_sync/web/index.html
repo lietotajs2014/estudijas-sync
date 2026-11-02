@@ -122,6 +122,8 @@ h3:first-child { margin-top: 0; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 .chip { border: 1px solid var(--line); background: var(--sheet); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
+.gcal-warn { margin: 8px 0 0; color: var(--bad); font-weight: 500; }
+.gcal-warn[hidden] { display: none; }
 .linkish { background: none; border: 0; padding: 0; color: var(--md); cursor: pointer; font: inherit; text-decoration: underline; }
 .small-link { font-size: 14px; margin-top: 4px; display: inline-block; }
 .tl-more.linkish { font-size: 12px; margin-top: 4px; display: block; }
@@ -268,6 +270,8 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
       <div class="brand">
         <h1>RTU estudijas</h1>
         <p id="subtitle">Termiņi, materiāli un jaunumi no estudijas.rtu.lv</p>
+        <p id="gcal-warn" class="gcal-warn" hidden>Google Calendar savienojums beidzies.
+          <button class="linkish" type="button" id="gcal-reconnect">Savienot no jauna</button></p>
       </div>
       <div class="stamp" aria-label="Statuss">
         <div><small>Students</small><b id="st-user">—</b></div>
@@ -669,6 +673,7 @@ async function loadStatus() {
   }
   renderAccount();
   renderSchedule();
+  $("#gcal-warn").hidden = !(CONFIG && CONFIG.values.google && STATUS.google_credentials && !STATUS.google_token);
   if (CONFIG) renderGcalRow();
   clearTimeout(pollTimer);
   pollTimer = setTimeout(loadStatus, busy ? 800 : 8000);
@@ -1100,6 +1105,7 @@ function showTab(name) {
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("#btn-sync").addEventListener("click", startSync);
 $("#q").addEventListener("input", e => { ui.q = e.target.value; renderDeadlines(); });
+$("#gcal-reconnect").addEventListener("click", () => runJob("gcal"));
 $("#show-past").addEventListener("click", () => { ui.showPast = !ui.showPast; renderDeadlines(); });
 $("#dlg-close").addEventListener("click", () => $("#dlg").close());
 $("#dlg").addEventListener("click", e => { if (e.target.id === "dlg") $("#dlg").close(); });
