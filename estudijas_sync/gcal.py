@@ -45,7 +45,16 @@ def get_service(cfg: Config, interactive: bool = False):
             if not cfg.google_credentials.exists():
                 raise GCalNotAuthorized(f"Nav atrasts {cfg.google_credentials} (skat. README).")
             flow = InstalledAppFlow.from_client_secrets_file(str(cfg.google_credentials), SCOPES)
-            creds = flow.run_local_server(port=0)
+            try:
+                creds = flow.run_local_server(
+                    port=0, timeout_seconds=300,
+                    authorization_prompt_message=("\nGoogle pieteikšanās saite (ja pārlūks rāda kļūdu, atver to "
+                                                  "inkognito logā):\n{url}\n"),
+                    success_message="Google Calendar savienots. Šo logu var aizvērt.")
+            except Exception as e:
+                raise GCalNotAuthorized(f"Google pieteikšanās netika pabeigta ({e}). Mēģini vēlreiz.") from e
+            if creds is None:
+                raise GCalNotAuthorized("Google pieteikšanās netika pabeigta 5 minūšu laikā. Mēģini vēlreiz.")
         else:
             raise GCalNotAuthorized("Google Calendar nav autorizēts — palaid: python run.py gcal-auth")
         tok.write_text(creds.to_json(), encoding="utf-8")
