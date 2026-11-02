@@ -98,6 +98,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("install-schedule", help="palaist automātiski (laiki no konfigurācijas)")
     sub.add_parser("uninstall-schedule", help="noņemt automātisko palaišanu")
     sub.add_parser("update", help="atjaunināt skriptu uz jaunāko versiju (git pull)")
+    wp = sub.add_parser("web", help="atvērt web paneli pārlūkā")
+    wp.add_argument("--port", type=int, default=8765)
+    wp.add_argument("--no-browser", action="store_true")
     ip = sub.add_parser("import-auth", help="iekopēt auth.json no cita datora (piem., Android/Termux)")
     ip.add_argument("file")
     args = ap.parse_args(argv)
@@ -123,30 +126,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nRežīms: {auth['mode']}. Tagad palaid: python run.py --profile {cfg.profile} sync")
         return 0
 
-    if args.cmd == "update":
-        import subprocess
-        from .schedule import PROJECT_DIR
-        if not (PROJECT_DIR / ".git").exists():
-            print("✖ Šī mape nav git repozitorijs. Lejupielādē jaunāko versiju no GitHub vai noklonē repozitoriju.")
-            return 1
-        before = subprocess.run(["git", "rev-parse", "HEAD"], cwd=PROJECT_DIR, capture_output=True, text=True).stdout.strip()
-        r = subprocess.run(["git", "pull", "--ff-only"], cwd=PROJECT_DIR, capture_output=True, text=True)
-        if r.returncode != 0:
-            print("✖ git pull neizdevās:\n" + (r.stderr or r.stdout).strip())
-            return 1
-        after = subprocess.run(["git", "rev-parse", "HEAD"], cwd=PROJECT_DIR, capture_output=True, text=True).stdout.strip()
-        if before == after:
-            print("✔ Jau ir jaunākā versija.")
-            return 0
-        log_ = subprocess.run(["git", "log", "--oneline", f"{before}..{after}"], cwd=PROJECT_DIR,
-                              capture_output=True, text=True).stdout.strip()
-        print("✔ Atjaunināts. Izmaiņas:\n" + log_)
-        changed = subprocess.run(["git", "diff", "--name-only", before, after], cwd=PROJECT_DIR,
-                                 capture_output=True, text=True).stdout.split()
-        if any(f.startswith("requirements") for f in changed):
-            print("Atjaunina bibliotēkas…")
-            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", str(PROJECT_DIR / "requirements.txt")])
+    if args.cmd == "web":
+        from .webui import serve
+        serve(cfg.profile, Path(args.config).expanduser() if args.config else None,
+              port=args.port, open_browser=not args.no_browser)
         return 0
+
+    if args.cmd == "update":
+        from .updater import do_update
+        ok, msg = do_update()
+        print(("✔ " if ok else "✖ ") + msg)
+        return 0 if ok else 1
 
     if args.cmd == "import-auth":
         src = Path(args.file).expanduser()

@@ -69,7 +69,7 @@ def describe_filter(cfg: Config, matchers: dict[int, Matcher]) -> str:
     parts = [prog] if prog else []
     if groups:
         parts.append(", ".join(map(str, groups)) + (". grupa" if len(groups) == 1 else ". grupas"))
-    return " · ".join(parts)
+    return ", ".join(parts)
 
 
 def plan_path(cfg: Config, item: FileItem, course_dir: Path, cats) -> tuple[str, Path]:
@@ -223,6 +223,19 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
             from .notify import send
             send(*note, open_path=out / chg.CHANGELOG)
 
+    drive_copied: list[str] = []
+    if cfg.drive_enabled:
+        try:
+            from .drive import mirror
+            prog.note("Kopē uz Drive…")
+            drive_copied = mirror(cfg, state)
+        except Exception as e:
+            log.exception("Drive")
+            warnings.append(f"Drive: {e}")
+
+    write_view(cfg, now, info, by_id, names, moodle, text_dl, others, ch, changes_md, report, warnings,
+               describe_filter(cfg, matchers), drive_copied, gcal_changes)
+
     state.data["last_run"] = now.isoformat(timespec="seconds")
     state.data["upcoming"] = [
         {"due": d.due.isoformat(), "title": d.title, "kind": d.kind,
@@ -232,4 +245,40 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     return {"courses": len(courses), "deadlines": len(moodle), "text_deadlines": len(text_dl),
             "new": len(report["new"]), "updated": len(report["updated"]), "errors": len(report["errors"]),
             "warnings": len(warnings), "gcal_changes": gcal_changes, "output": str(out),
-            "changes_text": chg.render_console(ch, by_id)}
+            "changes_text": chg.render_console(ch, by_id), "drive_copied": len(drive_copied)}
+
+
+def _dl_json(d, by_id: dict) -> dict:
+    c = by_id.get(d.course_id)
+    return {"uid": d.uid, "kind": d.kind, "title": d.title, "course": c.label if c else "",
+            "course_full": c.fullname if c else "", "due": d.due.isoformat(),
+            "start": d.start.isoformat() if d.start else None, "url": d.url, "status": d.status,
+            "done": d.done, "source": d.source, "relevance": d.relevance, "section": d.section,
+            "details": (d.details or "")[:700]}
+
+
+def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, text_dl, others, ch, changes_md,
+               report: dict, warnings: list[str], filter_desc: str, drive_copied: list[str], gcal_changes) -> None:
+    """Dati web panelim (view.json profila mapē)."""
+    import json
+    lo = now - timedelta(days=14)
+    view = {
+        "generated": now.isoformat(timespec="seconds"),
+        "user": info.get("fullname", ""),
+        "filter": filter_desc,
+        "deadlines": [_dl_json(d, by_id) for d in sorted(moodle, key=lambda d: d.due) if d.due >= lo],
+        "text_dates": [_dl_json(d, by_id) for d in text_dl if d.relevance != OTHER],
+        "hidden": [_dl_json(d, by_id) for d in sorted(others, key=lambda d: d.due) if d.due >= lo]
+                  + [_dl_json(d, by_id) for d in text_dl if d.relevance == OTHER],
+        "changes": {"md": changes_md, "counts": ch.counts(), "first_run": ch.first_run, "empty": ch.empty},
+        "courses": [{"id": cid, "label": c.label, "full": c.fullname, "url": c.url, "dir": names.get(cid, "")}
+                    for cid, c in sorted(by_id.items(), key=lambda kv: kv[1].fullname)],
+        "report": {k: report.get(k, []) for k in ("new", "updated", "skipped", "errors", "other")},
+        "warnings": warnings,
+        "drive_copied": drive_copied,
+        "gcal_changes": gcal_changes,
+    }
+    p = cfg.data_dir / "view.json"
+    tmp = p.with_name("view.json.tmp")
+    tmp.write_text(json.dumps(view, ensure_ascii=False, indent=1), encoding="utf-8")
+    os.replace(tmp, p)

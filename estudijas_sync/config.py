@@ -45,6 +45,11 @@ class Config:
     google_credentials: Path = APP_HOME / "credentials.json"
     google_calendar_name: str = "RTU estudijas"
     categories: dict[str, str] = field(default_factory=dict)
+    email: str = ""
+    drive_enabled: bool = False
+    drive_folder: Path | None = None
+    drive_categories: list[str] = field(default_factory=list)
+    drive_include_digest: bool = True
 
 
 def load_config(profile: str = "default", path: Path | None = None) -> Config:
@@ -60,6 +65,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         raw["categories"] = tomllib.loads(TEMPLATE.read_text(encoding="utf-8"))["categories"]
     sched = raw.get("schedule", {})
     cal = raw.get("calendar", {})
+    drive = raw.get("drive", {})
     cfg = Config(
         profile=profile, data_dir=data_dir, config_path=path,
         site=str(raw.get("site", "https://estudijas.rtu.lv")).rstrip("/"),
@@ -86,24 +92,65 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         google_credentials=_path(cal.get("google_credentials", str(APP_HOME / "credentials.json"))),
         google_calendar_name=cal.get("google_calendar_name", "RTU estudijas"),
         categories=dict(raw["categories"]),
+        email=str(raw.get("email", "")).strip(),
+        drive_enabled=bool(drive.get("enabled", False)),
+        drive_folder=_path(drive["folder"]) if drive.get("folder") else None,
+        drive_categories=[str(x) for x in drive.get("categories", ["Mājas darbi"])],
+        drive_include_digest=bool(drive.get("include_digest", True)),
     )
     if created:
         print(f"Izveidots konfigurācijas fails: {path}")
     return cfg
 
 
-def set_config_values(path: Path, values: dict[str, str]) -> None:
-    """Ieraksta vienkāršas augšējā līmeņa vērtības config.toml, saglabājot komentārus."""
-    text = path.read_text(encoding="utf-8")
-    for key, val in values.items():
-        val = str(val).replace("\\", "\\\\").replace('"', '\\"')
-        line = f'{key} = "{val}"'
-        rx = re.compile(rf'^({re.escape(key)}\s*=\s*)("[^"\n]*"|[^\s#]*)', re.M)
-        if rx.search(text):
-            text = rx.sub(lambda m: m.group(1) + f'"{val}"', text, count=1)
+def toml_value(v) -> str:
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    if isinstance(v, Path):
+        v = str(v)
+    if isinstance(v, (list, tuple)):
+        return "[" + ", ".join(toml_value(x) for x in v) + "]"
+    return json.dumps(str(v), ensure_ascii=False)
+
+
+_VALUE = r'("(?:[^"\\\n]|\\.)*"|\'[^\'\n]*\'|\[[^\]\n]*\]|[^#\s]+)'
+
+
+def set_toml_values(path: Path, values: dict[tuple[str | None, str], object]) -> None:
+    """Ieraksta vērtības config.toml ({(sadaļa|None, atslēga): vērtība}), saglabājot komentārus."""
+    lines = path.read_text(encoding="utf-8").split("\n")
+    for (section, key), val in values.items():
+        new_val = toml_value(val)
+        # sadaļas robežas
+        start, end = 0, len(lines)
+        if section:
+            hdr = next((i for i, ln in enumerate(lines) if ln.strip() == f"[{section}]"), None)
+            if hdr is None:
+                lines += ["", f"[{section}]"]
+                hdr = len(lines) - 1
+            start = hdr + 1
+            end = next((i for i in range(start, len(lines)) if lines[i].lstrip().startswith("[")
+                        and not lines[i].lstrip().startswith("[[") and "=" not in lines[i]), len(lines))
         else:
-            text = re.sub(r"^(site\s*=.*)$", lambda m: m.group(1) + "\n" + line, text, count=1, flags=re.M)
-    path.write_text(text, encoding="utf-8")
+            end = next((i for i, ln in enumerate(lines) if re.match(r"^\s*\[[^\]]+\]\s*$", ln)), len(lines))
+        rx = re.compile(rf"^(\s*{re.escape(key)}\s*=\s*){_VALUE}(.*)$")
+        for i in range(start, end):
+            m = rx.match(lines[i])
+            if m:
+                lines[i] = m.group(1) + new_val + m.group(3)
+                break
+        else:
+            ins = end
+            while ins > start and not lines[ins - 1].strip():
+                ins -= 1
+            lines.insert(ins, f"{key} = {new_val}")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def set_config_values(path: Path, values: dict[str, str]) -> None:
+    set_toml_values(path, {(None, k): v for k, v in values.items()})
 
 
 # ---- pieteikšanās dati ----

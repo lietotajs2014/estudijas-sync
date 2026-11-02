@@ -4,6 +4,28 @@ Automātiski pārbauda **estudijas.rtu.lv** (Moodle) 2× dienā. Lekciju prezent
 
 Parole nekur netiek glabāta. Tu vienreiz piesakies ar RTU e-pastu (Microsoft, arī MFA) parastā pārlūka logā. Pēc tam skripts strādā ar Moodle mobilās lietotnes piekļuves žetonu, ko izmanto arī oficiālā Moodle lietotne.
 
+## Web panelis
+
+Visu var darīt pārlūkā: Windows dubultklikšķis uz **`start.bat`** (macOS: `start.command`) vai `python run.py web`. Atveras `http://127.0.0.1:8765`.
+
+Panelī ir:
+- **Termiņi** — divu nedēļu laika ass un saraksts: nokavēts, šodien/rīt, šonedēļ, šomēnes. Filtri: KD, MD, testi, LD/PD. Ir iesniegšanas statuss, apraksti, datumi no paziņojumiem un saliktā sadaļā arī citām grupām paslēptais.
+- **Sinhronizēt tagad** ar progresa joslu un pēdējās sinhronizācijas laiku.
+- **Jaunumi** — kas mainījies pēdējā reizē un visa vēsture.
+- **Faili** — lejupielādētie faili pa kategorijām, poga "Atvērt" un "Atvērt mapi".
+- **Iestatījumi**:
+  - e-pasts, programma, grupa;
+  - izvades mape un lejupielādējamās kategorijas;
+  - Google Drive/OneDrive kopēšana ar mapes automātisku atrašanu;
+  - Google Calendar savienošana (augšupielādē `credentials.json` un spied "Savienot") un `.ics`;
+  - automātiskās palaišanas laiki ar ieslēgšanu/izslēgšanu un paziņojumi.
+- **Konts** — pieteikties, pieteikties no jauna vai aizmirst piekļuvi.
+- **Instrukcija** (šis fails) un **Žurnāls**.
+
+Panelis darbojas tikai tavā datorā (`127.0.0.1`), un citi tīkla dalībnieki tam nevar piekļūt. **Paroles lauka nav, un tas ir apzināti**: Microsoft pieteikšanās ar MFA notiek atvērtā logā, un e-pasts tiek aizpildīts automātiski. Automātiskās sinhronizācijas strādā arī tad, ja panelis ir aizvērts.
+
+**Google Drive:** ja datorā ir Google Drive for desktop, iestatījumos ieslēdz "Kopēt uz Drive" un izvēlies mapi, piemēram, `G:/My Drive/RTU estudijas`. Izvēlētās kategorijas (pēc noklusējuma mājas darbi) un `UZDEVUMI.md` parādīsies telefona Drive lietotnē. Termux tam nav vajadzīgs.
+
 ## Kas notiek katrā palaišanā
 
 ```
@@ -61,6 +83,8 @@ python run.py login     # atveras pārlūks → piesakies ar RTU e-pastu
 python run.py sync      # pirmā sinhronizācija (var aizņemt dažas minūtes)
 python run.py install-schedule   # turpmāk 07:30 un 19:30 automātiski
 ```
+
+To pašu var izdarīt web panelī: `python run.py web` vai `start.bat`.
 
 Konfigurācija atrodas `~/.estudijas_sync/default/config.toml` (Windows: `C:\Users\<tu>\.estudijas_sync\default\config.toml`). Tajā var iestatīt:
 

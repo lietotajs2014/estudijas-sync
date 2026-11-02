@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RTU estudijas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #eef2f4; --sheet: #fbfcfd; --grid: #d6dfe5; --grid-strong: #b9c7d1;
+  --ink: #1b2b3a; --ink-soft: #586977; --line: #c7d2da;
+  --kd: #c2362f; --md: #1f5fbf; --test: #b47b00; --ld: #2e7d4f; --other: #7a6a9c; --muted: #8796a2;
+  --ok: #2e7d4f; --warn: #b47b00; --bad: #c2362f;
+  --focus: #1f5fbf; --btn: #1b2b3a; --btn-ink: #fbfcfd;
+  --radius-s: 3px; --radius-m: 6px;
+  --font: "Barlow", system-ui, sans-serif;
+  --font-head: "Barlow Semi Condensed", "Barlow", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0f2236; --sheet: #132a42; --grid: #1c3753; --grid-strong: #29507a;
+    --ink: #e6eef5; --ink-soft: #9fb3c6; --line: #2a4766;
+    --kd: #ff7a70; --md: #79aef7; --test: #f2c14e; --ld: #6fd39a; --other: #b9a7e0; --muted: #7f95aa;
+    --ok: #6fd39a; --warn: #f2c14e; --bad: #ff7a70; --focus: #79aef7; --btn: #e6eef5; --btn-ink: #0f2236;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0f2236; --sheet: #132a42; --grid: #1c3753; --grid-strong: #29507a;
+  --ink: #e6eef5; --ink-soft: #9fb3c6; --line: #2a4766;
+  --kd: #ff7a70; --md: #79aef7; --test: #f2c14e; --ld: #6fd39a; --other: #b9a7e0; --muted: #7f95aa;
+  --ok: #6fd39a; --warn: #f2c14e; --bad: #ff7a70; --focus: #79aef7; --btn: #e6eef5; --btn-ink: #0f2236;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font: 400 16px/1.5 var(--font); font-variant-numeric: tabular-nums;
+}
+a { color: var(--md); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* ---------- galva: rasējuma lapa ar milimetru tīklu ---------- */
+.sheet-top {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-strong) 1px, transparent 1px),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+  background-position: -1px -1px;
+  border-bottom: 2px solid var(--ink);
+}
+.head { display: flex; gap: 24px; align-items: flex-end; justify-content: space-between; padding: 28px 0 20px; flex-wrap: wrap; }
+.brand h1 { font: 700 40px/1 var(--font-head); margin: 0; letter-spacing: -0.01em; }
+.brand p { margin: 6px 0 0; color: var(--ink-soft); }
+/* stūra spiedogs */
+.stamp { display: grid; grid-template-columns: repeat(3, minmax(110px, auto)) auto; border: 2px solid var(--ink); background: var(--sheet); }
+.stamp > div { padding: 6px 12px; border-right: 1px solid var(--ink); min-width: 0; }
+.stamp > div:last-child { border-right: 0; display: flex; align-items: center; padding: 8px; }
+.stamp small { display: block; color: var(--ink-soft); font-size: 12px; }
+.stamp b { font: 600 15px/1.3 var(--font-head); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.btn {
+  border: 2px solid var(--btn); background: var(--btn); color: var(--btn-ink); border-radius: var(--radius-s);
+  padding: 8px 16px; font: 600 15px/1.2 var(--font-head); cursor: pointer; white-space: nowrap;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn[disabled] { opacity: .55; cursor: progress; }
+.btn.ghost { background: transparent; color: var(--ink); }
+.btn.small { padding: 4px 10px; font-size: 14px; }
+.btn.danger { border-color: var(--bad); background: transparent; color: var(--bad); }
+
+/* progress */
+.progress { height: 0; overflow: hidden; transition: height .2s; }
+.progress.on { height: 46px; }
+.progress .bar { height: 6px; background: var(--grid); border: 1px solid var(--ink); }
+.progress .fill { height: 100%; background: var(--md); width: 0; transition: width .3s; }
+.progress .txt { font-size: 14px; color: var(--ink-soft); padding-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* laika ass — galvenais elements */
+.timeline { padding: 4px 0 22px; }
+.timeline h2 { font: 600 18px/1.2 var(--font-head); margin: 0 0 10px; }
+.tl-scroll { overflow-x: auto; }
+.tl { display: grid; grid-template-columns: repeat(14, minmax(72px, 1fr)); border: 2px solid var(--ink); background: var(--sheet); min-width: 1008px; }
+.tl-day { border-right: 1px solid var(--line); min-height: 128px; padding: 6px 6px 8px; position: relative; }
+.tl-day:last-child { border-right: 0; }
+.tl-day.weekend { background: color-mix(in srgb, var(--grid) 35%, transparent); }
+.tl-day.today { box-shadow: inset 0 0 0 2px var(--md); }
+.tl-day .d { font: 600 22px/1 var(--font-head); }
+.tl-day .w { font-size: 12px; color: var(--ink-soft); margin-left: 4px; }
+.tl-mark {
+  display: block; margin-top: 6px; padding: 3px 5px 3px 7px; font-size: 12.5px; line-height: 1.25;
+  border-left: 4px solid var(--c, var(--muted)); background: color-mix(in srgb, var(--c, var(--muted)) 12%, transparent);
+  color: var(--ink); text-decoration: none;
+}
+.tl-mark .tl-t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+.tl-mark .tl-c { display: block; color: var(--ink-soft); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-mark.done { opacity: .5; }
+.tl-mark.done .tl-t { text-decoration: line-through; }
+.tl-mark.guess { border-left-style: dashed; }
+.tl-more { font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+
+/* cilnes */
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; margin-top: 18px; border-bottom: 1px solid var(--line); }
+nav.tabs button {
+  border: 0; background: none; padding: 10px 14px; cursor: pointer; color: var(--ink-soft);
+  font: 600 16px/1 var(--font-head); border-bottom: 3px solid transparent; white-space: nowrap;
+}
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+nav.tabs .count { font-weight: 500; color: var(--ink-soft); margin-left: 4px; }
+main { padding: 20px 0 64px; }
+section[hidden] { display: none !important; }
+h3 { font: 600 20px/1.25 var(--font-head); margin: 28px 0 10px; }
+h3:first-child { margin-top: 0; }
+.muted { color: var(--ink-soft); }
+.note { color: var(--ink-soft); font-size: 14px; max-width: 70ch; }
+
+/* filtri */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.chip { border: 1px solid var(--line); background: var(--sheet); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 14px; }
+.chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
+.chip .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 6px; }
+.search { flex: 1 1 200px; max-width: 320px; border: 1px solid var(--line); background: var(--sheet); border-radius: var(--radius-s); padding: 5px 10px; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+
+/* termiņu saraksts */
+.group-title { font: 600 15px/1 var(--font-head); color: var(--ink-soft); margin: 22px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.group-title.alert { color: var(--bad); border-color: var(--bad); }
+.dl { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.dl .date { text-align: center; border: 1px solid var(--ink); background: var(--sheet); padding: 4px 0 5px; }
+.dl .date .n { font: 700 24px/1 var(--font-head); display: block; }
+.dl .date .m { font-size: 12px; color: var(--ink-soft); }
+.dl .body { min-width: 0; }
+.dl .title { font-weight: 600; text-decoration: none; color: var(--ink); }
+.dl .title:hover { text-decoration: underline; }
+.kind { display: inline-block; font: 600 12px/1 var(--font-head); padding: 3px 6px; border-radius: var(--radius-s); color: #fff; background: var(--c); margin-right: 8px; vertical-align: 2px; }
+:root[data-theme="dark"] .kind { color: #0f2236; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kind { color: #0f2236; } }
+.dl .meta { font-size: 14px; color: var(--ink-soft); margin-top: 2px; }
+.dl .meta span + span::before { content: "/"; margin: 0 7px; color: var(--line); }
+.dl .side { text-align: right; font-size: 14px; white-space: nowrap; }
+.dl .rel { font-weight: 600; }
+.dl .rel.soon { color: var(--bad); }
+.status { display: inline-block; margin-top: 4px; font-size: 13px; }
+.status.ok { color: var(--ok); } .status.todo { color: var(--warn); }
+.dl details { margin-top: 6px; }
+.dl details summary { cursor: pointer; font-size: 14px; color: var(--ink-soft); }
+.dl details pre { white-space: pre-wrap; font: 14px/1.5 var(--font); margin: 6px 0 0; max-width: 75ch; }
+.dl.done .title { text-decoration: line-through; color: var(--ink-soft); }
+.dl.guess .date { border-style: dashed; }
+.empty { padding: 32px; border: 2px dashed var(--line); text-align: center; color: var(--ink-soft); }
+.empty .btn { margin-top: 12px; }
+
+/* kartes / formas */
+.panel { background: var(--sheet); border: 1px solid var(--line); border-radius: var(--radius-m); padding: 18px 20px; margin-bottom: 18px; }
+.panel h4 { font: 600 17px/1.2 var(--font-head); margin: 0 0 4px; }
+.panel > .note { margin: 0 0 14px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
+.field label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+.field input[type=text], .field input[type=email], .field input[type=number], .field select, .field textarea {
+  width: 100%; border: 1px solid var(--line); background: var(--paper); border-radius: var(--radius-s); padding: 7px 10px;
+}
+.field textarea { min-height: 64px; resize: vertical; }
+.field .hint { font-size: 13px; color: var(--ink-soft); margin-top: 3px; }
+.toggle { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.toggle input { margin-top: 4px; width: 18px; height: 18px; accent-color: var(--md); }
+.cats { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.suggest { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.suggest button { text-align: left; border: 1px dashed var(--line); background: none; padding: 4px 8px; cursor: pointer; font-size: 13px; border-radius: var(--radius-s); }
+.savebar { position: sticky; bottom: 0; background: var(--paper); border-top: 2px solid var(--ink); padding: 12px 0; display: flex; gap: 12px; align-items: center; margin-top: 8px; }
+.pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 13px; border: 1px solid currentColor; }
+.pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); }
+
+/* tabulas, dokumenti */
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font-weight: 600; color: var(--ink-soft); border-bottom: 2px solid var(--ink); padding: 6px 8px; }
+td { border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+td.path { word-break: break-word; }
+.doc { background: var(--sheet); border: 1px solid var(--line); padding: 8px 28px 24px; border-radius: var(--radius-m); max-width: 860px; }
+.doc h1, .doc h2, .doc h3 { font-family: var(--font-head); }
+.doc pre { background: var(--paper); padding: 10px 12px; overflow-x: auto; border-radius: var(--radius-s); }
+.doc code { font-size: 0.92em; }
+.doc table { margin: 10px 0; }
+pre.log { background: var(--sheet); border: 1px solid var(--line); padding: 12px; font-size: 12.5px; line-height: 1.45; max-height: 70vh; overflow: auto; white-space: pre-wrap; }
+.toast {
+  position: fixed; right: 16px; bottom: 16px; max-width: min(460px, calc(100vw - 32px)); background: var(--ink); color: var(--sheet);
+  padding: 12px 16px; border-radius: var(--radius-m); white-space: pre-wrap; font-size: 14px; z-index: 10;
+  transform: translateY(20px); opacity: 0; transition: .2s; pointer-events: none;
+}
+.toast.on { transform: none; opacity: 1; pointer-events: auto; }
+.toast.bad { background: var(--bad); color: #fff; }
+footer { color: var(--ink-soft); font-size: 13px; padding: 20px 0 40px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--line); }
+footer button.link { background: none; border: 0; color: var(--md); cursor: pointer; padding: 0; font-size: 13px; text-decoration: underline; }
+
+@media (max-width: 760px) {
+  .brand h1 { font-size: 30px; }
+  .stamp { grid-template-columns: 1fr 1fr; width: 100%; }
+  .stamp > div { border-bottom: 1px solid var(--ink); }
+  .stamp > div:nth-child(2n) { border-right: 0; }
+  .stamp > div:nth-child(3) { grid-column: 1 / -1; border-right: 0; }
+  .stamp > div:last-child { grid-column: 1 / -1; border-bottom: 0; }
+  .stamp > div:last-child .btn { width: 100%; }
+  .dl { grid-template-columns: 52px 1fr; }
+  .dl .side { grid-column: 2; text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="sheet-top">
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">
+        <h1>RTU estudijas</h1>
+        <p id="subtitle">Termiņi, materiāli un jaunumi no estudijas.rtu.lv</p>
+      </div>
+      <div class="stamp" aria-label="Statuss">
+        <div><small>Students</small><b id="st-user">—</b></div>
+        <div><small>Programma, grupa</small><b id="st-filter">—</b></div>
+        <div><small>Pēdējā sinhronizācija</small><b id="st-last">—</b></div>
+        <div><button class="btn" id="btn-sync" type="button">Sinhronizēt tagad</button></div>
+      </div>
+    </div>
+    <div class="progress" id="progress" aria-live="polite">
+      <div class="bar"><div class="fill" id="pfill"></div></div>
+      <div class="txt" id="ptxt"></div>
+    </div>
+    <div class="timeline">
+      <h2>Nākamās divas nedēļas</h2>
+      <div class="tl-scroll"><div class="tl" id="timeline"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-tab="termini" aria-selected="true">Termiņi<span class="count" id="cnt-dl"></span></button>
+    <button role="tab" data-tab="jaunumi" aria-selected="false">Jaunumi<span class="count" id="cnt-new"></span></button>
+    <button role="tab" data-tab="faili" aria-selected="false">Faili</button>
+    <button role="tab" data-tab="iestatijumi" aria-selected="false">Iestatījumi</button>
+    <button role="tab" data-tab="konts" aria-selected="false">Konts</button>
+    <button role="tab" data-tab="readme" aria-selected="false">Instrukcija</button>
+    <button role="tab" data-tab="zurnals" aria-selected="false">Žurnāls</button>
+  </nav>
+
+  <main>
+    <!-- TERMIŅI -->
+    <section data-panel="termini">
+      <div class="filters" id="kind-filters"></div>
+      <div class="filters">
+        <input class="search" id="q" type="search" placeholder="Meklēt kursu vai uzdevumu" aria-label="Meklēt">
+        <label class="check"><input type="checkbox" id="show-done"> Rādīt izpildītos</label>
+        <label class="check"><input type="checkbox" id="show-text" checked> Datumi no paziņojumiem</label>
+        <a class="btn ghost small" id="ics-link" href="#" download="termini.ics">Lejupielādēt .ics</a>
+      </div>
+      <div id="dl-list"></div>
+      <div id="hidden-box"></div>
+    </section>
+
+    <!-- JAUNUMI -->
+    <section data-panel="jaunumi" hidden>
+      <div id="changes-now"></div>
+      <h3>Vēsture</h3>
+      <div class="doc" id="changelog"></div>
+    </section>
+
+    <!-- FAILI -->
+    <section data-panel="faili" hidden>
+      <div class="filters">
+        <button class="btn small" id="open-out" type="button">Atvērt mapi</button>
+        <span class="muted" id="out-path"></span>
+      </div>
+      <div class="filters" id="file-filters"></div>
+      <div id="files"></div>
+    </section>
+
+    <!-- IESTATĪJUMI -->
+    <section data-panel="iestatijumi" hidden>
+      <form id="cfg-form" autocomplete="off">
+        <div class="panel">
+          <h4>Par tevi</h4>
+          <p class="note">Vienā kursā bieži ir vairāku programmu un grupu uzdevumi. Tiek rādīts tikai tas, kas attiecas uz tevi.</p>
+          <div class="form-grid">
+            <div class="field"><label for="f-email">RTU e-pasts</label>
+              <input type="email" id="f-email" name="email" placeholder="vards.uzvards@edu.rtu.lv">
+              <div class="hint">Aizpilda Microsoft pieteikšanās logu. Parole netiek prasīta un nekur netiek glabāta.</div></div>
+            <div class="field"><label for="f-program">Studiju programma</label>
+              <input type="text" id="f-program" name="program" placeholder="RMCE0"></div>
+            <div class="field"><label for="f-group">Grupa</label>
+              <input type="text" id="f-group" name="group" placeholder="3"></div>
+            <div class="field"><label for="f-other">Citu grupu materiāli</label>
+              <select id="f-other" name="other_groups">
+                <option value="skip">Nelejupielādēt, tikai uzskaitīt</option>
+                <option value="folder">Likt mapē "_Citām grupām"</option>
+                <option value="keep">Neatlasīt, rādīt visu</option>
+              </select></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>Faili datorā</h4>
+          <div class="form-grid">
+            <div class="field"><label for="f-out">Mape</label>
+              <input type="text" id="f-out" name="output_dir"></div>
+            <div class="field"><label for="f-max">Maksimālais faila izmērs, MB</label>
+              <input type="number" id="f-max" name="download_max_mb" min="1"></div>
+            <div class="field"><label for="f-excl">Izslēgtie kursi</label>
+              <textarea id="f-excl" name="exclude_courses" placeholder="Viens nosaukums vai tā daļa katrā rindā"></textarea></div>
+          </div>
+          <div class="field" style="margin-top:14px"><label>Lejupielādēt kategorijas</label>
+            <div class="cats" id="only-cats"></div>
+            <div class="hint">Ja nekas nav atzīmēts, tiek lejupielādēts viss.</div></div>
+        </div>
+
+        <div class="panel">
+          <h4>Google Drive vai OneDrive</h4>
+          <p class="note">Kopē izvēlētos failus uz mapi, ko sinhronizē Drive for desktop vai OneDrive. Tā mājas darbi ir pieejami telefona Drive lietotnē.</p>
+          <label class="toggle"><input type="checkbox" name="drive_enabled" id="f-drive"> <span>Kopēt uz Drive</span></label>
+          <div class="form-grid" style="margin-top:12px">
+            <div class="field"><label for="f-dfolder">Drive mape</label>
+              <input type="text" id="f-dfolder" name="drive_folder" placeholder="G:/My Drive/RTU estudijas">
+              <div class="row"><button class="btn ghost small" type="button" id="detect-drive">Atrast Drive mapi</button></div>
+              <div class="suggest" id="drive-suggest"></div></div>
+            <div class="field"><label>Ko kopēt</label>
+              <div class="cats" id="drive-cats"></div>
+              <label class="toggle" style="margin-top:10px"><input type="checkbox" name="drive_include_digest"> <span>Arī UZDEVUMI.md, JAUNUMI.md un termini.ics</span></label></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>Kalendārs</h4>
+          <div class="form-grid">
+            <div>
+              <label class="toggle"><input type="checkbox" name="google" id="f-google"> <span>Google Calendar
+                <span class="hint muted" style="display:block;font-size:13px">Atsevišķā kalendārā, atjaunojas automātiski, redzams telefonā.</span></span></label>
+              <div class="row" id="gcal-row"></div>
+            </div>
+            <div>
+              <label class="toggle"><input type="checkbox" name="ics"> <span>termini.ics fails
+                <span class="hint muted" style="display:block;font-size:13px">Importēšanai Outlook vai Apple kalendārā.</span></span></label>
+              <label class="toggle" style="margin-top:10px"><input type="checkbox" name="include_text_dates"> <span>Arī datumi no paziņojumiem</span></label>
+            </div>
+            <div class="field"><label for="f-calname">Kalendāra nosaukums</label>
+              <input type="text" id="f-calname" name="google_calendar_name"></div>
+            <div class="field"><label for="f-rem">Atgādinājumi, minūtes pirms</label>
+              <input type="text" id="f-rem" name="reminders_minutes" placeholder="1440, 120">
+              <div class="hint">1440 = diena, 120 = divas stundas</div></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h4>Automātiskā sinhronizācija un paziņojumi</h4>
+          <div class="form-grid">
+            <div class="field"><label for="f-times">Laiki</label>
+              <input type="text" id="f-times" name="schedule_times" placeholder="07:30, 19:30">
+              <div class="row"><span id="sched-state"></span><button class="btn ghost small" type="button" id="sched-btn"></button></div></div>
+            <div>
+              <label class="toggle"><input type="checkbox" name="notify"> <span>Paziņojums, ja kaut kas jauns</span></label>
+            </div>
+            <div class="field"><label for="f-look">Termiņi uz priekšu, dienas</label>
+              <input type="number" id="f-look" name="lookahead_days" min="7"></div>
+          </div>
+        </div>
+
+        <div class="savebar">
+          <button class="btn" type="submit">Saglabāt iestatījumus</button>
+          <span class="muted" id="save-state"></span>
+          <span style="flex:1"></span>
+          <button class="btn ghost small" type="button" id="open-config">Atvērt config.toml</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- KONTS -->
+    <section data-panel="konts" hidden>
+      <div class="panel" id="account"></div>
+      <div class="panel">
+        <h4>Kā notiek pieteikšanās</h4>
+        <p class="note">Poga atver Microsoft logu. Tur ievadi paroli un, ja prasa, MFA kodu. Pēc tam skripts saņem Moodle lietotnes piekļuves atslēgu, kas derīga apmēram trīs mēnešus. Paroli neredz ne skripts, ne šis panelis. Atslēgu jebkurā brīdī var atsaukt estudijās: Preferences, Security keys.</p>
+      </div>
+    </section>
+
+    <!-- README -->
+    <section data-panel="readme" hidden>
+      <div class="doc" id="readme"></div>
+    </section>
+
+    <!-- ŽURNĀLS -->
+    <section data-panel="zurnals" hidden>
+      <div class="filters">
+        <button class="btn small ghost" type="button" id="reload-log">Atjaunot</button>
+        <button class="btn small ghost" type="button" id="open-data">Atvērt datu mapi</button>
+      </div>
+      <div id="lastjob"></div>
+      <pre class="log" id="log"></pre>
+    </section>
+  </main>
+
+  <footer>
+    <span id="ver"></span>
+    <button class="link" type="button" id="btn-update">Atjaunināt no GitHub</button>
+    <button class="link" type="button" id="theme">Mainīt tēmu</button>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+<script>
+"use strict";
+const TOKEN = "__TOKEN__";
+const KIND = {
+  KD: "var(--kd)", "Eksāmens": "var(--kd)", Tests: "var(--test)", MD: "var(--md)",
+  LD: "var(--ld)", PD: "var(--ld)", "Termiņš": "var(--muted)", Uzdevums: "var(--muted)", Notikums: "var(--other)"
+};
+const FILTER_KINDS = [["KD", "KD, eksāmeni", ["KD", "Eksāmens"]], ["MD", "MD", ["MD"]], ["Tests", "Testi", ["Tests"]],
+  ["LD", "LD, PD", ["LD", "PD"]], ["other", "Citi", null]];
+const WD = ["Sv", "P", "O", "T", "C", "Pk", "S"];
+const MON = ["janv.", "febr.", "marts", "apr.", "maijs", "jūn.", "jūl.", "aug.", "sept.", "okt.", "nov.", "dec."];
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v; else if (k === "text") e.textContent = v;
+    else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (k === "style") e.style.cssText = v;
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null) e.append(c.nodeType ? c : document.createTextNode(c));
+  return e;
+};
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "X-Token": TOKEN, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  const ct = r.headers.get("content-type") || "";
+  const data = ct.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error((data && (data.error || data.message)) || `HTTP ${r.status}`);
+  return data;
+}
+const post = (path, body = {}) => api(path, { method: "POST", body: JSON.stringify(body) });
+
+let toastTimer;
+function toast(msg, bad = false) {
+  const t = $("#toast"); t.textContent = msg; t.className = "toast on" + (bad ? " bad" : "");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.className = "toast", bad ? 9000 : 5000);
+}
+
+function md(text) {
+  if (!text) return el("p", { class: "muted", text: "Nav satura." });
+  const box = el("div");
+  box.innerHTML = (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(text)) : miniMd(text);
+  // lokālās saites (faili izvades mapē) atver datorā
+  $$("a", box).forEach(a => {
+    const href = a.getAttribute("href") || "";
+    if (/^https?:/i.test(href)) { a.target = "_blank"; a.rel = "noopener"; return; }
+    if (href.startsWith("#")) return;
+    a.addEventListener("click", e => { e.preventDefault(); openPath(decodeURIComponent(href.replace(/^<|>$/g, ""))); });
+  });
+  return box;
+}
+
+/* rezerves Markdown, ja CDN nav pieejams (viss teksts tiek escapēts) */
+function miniMd(src) {
+  const esc = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const inline = s => esc(s)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g, "$1<em>$2</em>")
+    .replace(/\[([^\]]+)\]\(&lt;([^)]*?)&gt;\)|\[([^\]]+)\]\(([^)\s]+)\)/g,
+      (m, t1, u1, t2, u2) => `<a href="${(u1 || u2).replace(/^javascript:/i, "")}">${t1 || t2}</a>`);
+  const lines = src.replace(/<!--[\s\S]*?-->/g, "").replace(/<\/?(details|summary)[^>]*>/g, "").split("\n");
+  let html = "", i = 0;
+  while (i < lines.length) {
+    const ln = lines[i];
+    if (/^```/.test(ln)) { const buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]); i++;
+      html += `<pre><code>${esc(buf.join("\n"))}</code></pre>`; continue; }
+    const h = ln.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; i++; continue; }
+    if (/^\s*\|/.test(ln)) { const rows = []; while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = r => r.trim().replace(/^\||\|$/g, "").split(/(?<!\\)\|/).map(c => inline(c.trim().replace(/\\\|/g, "|")));
+      html += "<table><thead><tr>" + cells(rows[0]).map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>"
+        + rows.slice(2).map(r => "<tr>" + cells(r).map(c => `<td>${c}</td>`).join("") + "</tr>").join("") + "</tbody></table>"; continue; }
+    if (/^\s*[-*]\s+/.test(ln)) { html += "<ul>"; while (i < lines.length && /^\s*([-*]\s+|\s{2,}\S)/.test(lines[i])) {
+        html += `<li>${inline(lines[i].replace(/^\s*[-*]\s+/, "").trim())}</li>`; i++; } html += "</ul>"; continue; }
+    if (/^\s*\d+\.\s+/.test(ln)) { html += "<ol>"; while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        html += `<li>${inline(lines[i].replace(/^\s*\d+\.\s+/, ""))}</li>`; i++; } html += "</ol>"; continue; }
+    if (/^>\s?/.test(ln)) { html += `<blockquote>${inline(ln.replace(/^>\s?/, ""))}</blockquote>`; i++; continue; }
+    if (!ln.trim()) { i++; continue; }
+    const buf = []; while (i < lines.length && lines[i].trim() && !/^(#|```|\s*[-*]\s|\s*\||>)/.test(lines[i])) buf.push(lines[i++]);
+    html += `<p>${buf.map(inline).join("<br>")}</p>`;
+  }
+  return html;
+}
+
+function fmtDate(iso, withTime = true) {
+  const d = new Date(iso);
+  const s = `${WD[d.getDay()]} ${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`;
+  return withTime ? `${s} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : s;
+}
+function dayDiff(iso) {
+  const a = new Date(); a.setHours(0, 0, 0, 0);
+  const b = new Date(iso); b.setHours(0, 0, 0, 0);
+  return Math.round((b - a) / 86400000);
+}
+function rel(iso) {
+  const d = new Date(iso), now = new Date(), n = dayDiff(iso);
+  if (d < now) return n < 0 ? `nokavēts ${-n} d.` : "šodien beidzās";
+  if (n === 0) { const h = Math.max(1, Math.round((d - now) / 3600000)); return `šodien, ~${h} h`; }
+  if (n === 1) return "rīt";
+  return `pēc ${n} d.`;
+}
+function ago(iso) {
+  if (!iso) return "nekad";
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "tikko"; if (m < 60) return `pirms ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `pirms ${h} h`;
+  return fmtDate(iso);
+}
+
+/* ---------- stāvoklis ---------- */
+let STATUS = {}, VIEW = {}, CONFIG = null, FILES = [];
+const ui = { kinds: new Set(), q: "", showDone: false, showText: true, fileCat: "" };
+
+async function loadStatus() {
+  try { STATUS = await api("/api/status"); } catch (e) { return; }
+  const s = STATUS;
+  $("#st-user").textContent = s.auth.fullname || VIEW.user || (s.auth.mode ? "pieteicies" : "nav pieteicies");
+  $("#st-last").textContent = s.last_run ? ago(s.last_run) : "vēl nav";
+  $("#st-last").title = s.last_run ? fmtDate(s.last_run) : "";
+  $("#ver").textContent = `Versija ${s.version}${s.git_version ? `, ${s.git_version}` : ""}`;
+  $("#out-path").textContent = s.output_dir;
+  const busy = !!s.job;
+  $("#btn-sync").disabled = busy;
+  $("#btn-sync").textContent = busy ? (s.job.name === "Sinhronizācija" ? "Sinhronizē…" : s.job.name + "…") : "Sinhronizēt tagad";
+  const p = s.progress, bar = $("#progress");
+  bar.classList.toggle("on", busy);
+  if (busy) {
+    $("#pfill").style.width = (p.active ? p.percent : 4) + "%";
+    const bytes = p.bytes_total ? `, ${(p.bytes_done / 1048576).toFixed(1)} no ${(p.bytes_total / 1048576).toFixed(1)} MB` : "";
+    $("#ptxt").textContent = p.active ? `${p.title}: ${p.count} no ${p.total}${bytes}${p.label ? `. ${p.label}` : ""}`
+      : (p.lines.slice(-1)[0] || `${s.job.name} sākta…`);
+  }
+  if (lastJobSeen !== (s.last_job && s.last_job.finished)) {
+    const first = lastJobSeen === undefined;
+    lastJobSeen = s.last_job && s.last_job.finished;
+    if (!first && s.last_job) {
+      toast(`${s.last_job.name}: ${s.last_job.message.split("\n\n")[0]}`, !s.last_job.ok);
+      if (s.last_job.name === "Sinhronizācija" || s.last_job.name === "Pieteikšanās") { await loadView(); loadFiles(); }
+      if (s.last_job.name === "Google Calendar") loadConfig();
+    }
+    renderLastJob();
+  }
+  renderAccount();
+  renderSchedule();
+  if (CONFIG) renderGcalRow();
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(loadStatus, busy ? 800 : 8000);
+}
+let pollTimer, lastJobSeen;
+
+async function loadView() {
+  try { VIEW = await api("/api/view"); } catch (e) { VIEW = {}; }
+  $("#st-filter").textContent = VIEW.filter || (CONFIG && CONFIG.values.program ? `${CONFIG.values.program}, ${CONFIG.values.group}. gr.` : "nav norādīta");
+  if (VIEW.user) $("#st-user").textContent = VIEW.user;
+  renderTimeline(); renderDeadlines(); renderChanges();
+}
+
+/* ---------- laika ass ---------- */
+function allItems() {
+  const items = (VIEW.deadlines || []).slice();
+  if (ui.showText) items.push(...(VIEW.text_dates || []));
+  return items.sort((a, b) => a.due.localeCompare(b.due));
+}
+function renderTimeline() {
+  const tl = $("#timeline"); tl.replaceChildren();
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const items = allItems().filter(d => !d.done || ui.showDone);
+  for (let i = 0; i < 14; i++) {
+    const day = new Date(start); day.setDate(start.getDate() + i);
+    const dow = day.getDay();
+    const col = el("div", { class: "tl-day" + (i === 0 ? " today" : "") + (dow === 0 || dow === 6 ? " weekend" : "") },
+      el("span", { class: "d", text: day.getDate() }), el("span", { class: "w", text: i === 0 ? "šodien" : WD[dow] }));
+    const todays = items.filter(d => dayDiff(d.due) === i);
+    todays.slice(0, 3).forEach(d => col.append(el("a", {
+      class: "tl-mark" + (d.done ? " done" : "") + (d.source === "teksts" ? " guess" : ""),
+      style: `--c:${KIND[d.kind] || "var(--muted)"}`, href: d.url || "#", target: "_blank", rel: "noopener",
+      title: `${d.kind}: ${d.title}\n${d.course_full}\n${fmtDate(d.due)}${d.status ? "\n" + d.status : ""}`,
+    }, el("span", { class: "tl-t", text: d.source === "teksts" ? d.details : d.title }), el("span", { class: "tl-c", text: `${d.kind}, ${d.course}` }))));
+    if (todays.length > 3) col.append(el("div", { class: "tl-more", text: `vēl ${todays.length - 3}` }));
+    tl.append(col);
+  }
+}
+
+/* ---------- termiņi ---------- */
+function kindMatch(d) {
+  if (!ui.kinds.size) return true;
+  for (const key of ui.kinds) {
+    const f = FILTER_KINDS.find(k => k[0] === key);
+    if (f[2] ? f[2].includes(d.kind) : !["KD", "Eksāmens", "MD", "Tests", "LD", "PD"].includes(d.kind)) return true;
+  }
+  return false;
+}
+function renderKindFilters() {
+  const box = $("#kind-filters"); box.replaceChildren();
+  box.append(el("button", { class: "chip", type: "button", "aria-pressed": String(!ui.kinds.size),
+    onclick: () => { ui.kinds.clear(); renderKindFilters(); renderDeadlines(); } }, "Visi"));
+  FILTER_KINDS.forEach(([key, label, kinds]) => box.append(el("button", {
+    class: "chip", type: "button", "aria-pressed": String(ui.kinds.has(key)),
+    onclick: () => { ui.kinds.has(key) ? ui.kinds.delete(key) : ui.kinds.add(key); renderKindFilters(); renderDeadlines(); }
+  }, el("span", { class: "sw", style: `--c:${kinds ? KIND[kinds[0]] : "var(--muted)"}` }), label)));
+}
+function dlRow(d) {
+  const due = new Date(d.due), n = dayDiff(d.due);
+  const guess = d.source === "teksts";
+  const status = d.status ? el("span", { class: "status " + (d.done ? "ok" : "todo"), text: (d.done ? "✓ " : "") + d.status }) : null;
+  const relLabel = { "tev": "tavai grupai" }[d.relevance] || d.relevance;
+  const src = guess ? d.title.replace(/^[^(]*\((.*)\)$/, "$1") : "";
+  const meta = el("div", { class: "meta" }, el("span", { text: d.course_full || d.course }),
+    d.section ? el("span", { text: d.section }) : null,
+    guess ? el("span", { text: `no "${src}", pārbaudi` }) : null,
+    relLabel ? el("span", { text: relLabel }) : null);
+  const shownTitle = guess ? (d.details.length > 110 ? d.details.slice(0, 108) + "…" : d.details) : d.title;
+  const body = el("div", { class: "body" },
+    el("span", { class: "kind", style: `--c:${KIND[d.kind] || "var(--muted)"}`, text: d.kind }),
+    d.url ? el("a", { class: "title", href: d.url, target: "_blank", rel: "noopener", text: shownTitle }) : el("span", { class: "title", text: shownTitle }),
+    meta);
+  if (d.details && !(guess && d.details.length <= 110)) body.append(el("details", {}, el("summary", { text: guess ? "Teksts" : "Apraksts" }), el("pre", { text: d.details })));
+  return el("div", { class: "dl" + (d.done ? " done" : "") + (guess ? " guess" : "") },
+    el("div", { class: "date" }, el("span", { class: "n", text: due.getDate() }),
+      el("span", { class: "m", text: MON[due.getMonth()] })),
+    body,
+    el("div", { class: "side" },
+      el("div", { class: "rel" + (n <= 2 && !d.done && due > new Date() ? " soon" : ""), text: rel(d.due) }),
+      el("div", { class: "muted", text: fmtDate(d.due) }), status));
+}
+function renderDeadlines() {
+  const list = $("#dl-list"); list.replaceChildren();
+  if (!STATUS.auth || !STATUS.auth.mode) {
+    list.append(el("div", { class: "empty" }, el("p", { text: "Vispirms piesakies ar savu RTU kontu." }),
+      el("button", { class: "btn", type: "button", onclick: startLogin }, "Pieteikties")));
+    $("#cnt-dl").textContent = ""; return;
+  }
+  if (!VIEW.generated) {
+    list.append(el("div", { class: "empty" }, el("p", { text: "Vēl nav sinhronizēts. Pirmā reize var aizņemt dažas minūtes." }),
+      el("button", { class: "btn", type: "button", onclick: startSync }, "Sinhronizēt tagad")));
+    return;
+  }
+  const q = ui.q.toLowerCase(), now = new Date();
+  const items = allItems().filter(d => kindMatch(d) && (ui.showDone || !d.done)
+    && (!q || `${d.title} ${d.course_full} ${d.course} ${d.section}`.toLowerCase().includes(q)));
+  const groups = [
+    ["Nokavēts", d => new Date(d.due) < now && !d.done && d.status, true],
+    ["Šodien un rīt", d => new Date(d.due) >= now && dayDiff(d.due) <= 1],
+    ["Šonedēļ", d => dayDiff(d.due) >= 2 && dayDiff(d.due) <= 7],
+    ["Šomēnes", d => dayDiff(d.due) > 7 && dayDiff(d.due) <= 31],
+    ["Vēlāk", d => dayDiff(d.due) > 31],
+  ];
+  const open = allItems().filter(d => !d.done && new Date(d.due) >= now && dayDiff(d.due) <= 7).length;
+  $("#cnt-dl").textContent = open ? String(open) : "";
+  let shown = 0;
+  for (const [title, fn, alert] of groups) {
+    const rows = items.filter(fn);
+    if (!rows.length) continue;
+    shown += rows.length;
+    list.append(el("div", { class: "group-title" + (alert ? " alert" : ""), text: `${title} (${rows.length})` }), ...rows.map(dlRow));
+  }
+  if (!shown) list.append(el("div", { class: "empty", text: q || ui.kinds.size ? "Nekas neatbilst filtram." : "Nav gaidāmu termiņu." }));
+  const hb = $("#hidden-box"); hb.replaceChildren();
+  const hidden = VIEW.hidden || [], otherFiles = (VIEW.report || {}).other || [];
+  if (hidden.length || otherFiles.length) {
+    const det = el("details", { style: "margin-top:28px" },
+      el("summary", { class: "muted", text: `Citām grupām un programmām paslēpts: ${hidden.length} termiņi, ${otherFiles.length} faili` }),
+      el("p", { class: "note", text: "Ja kaut kas no šī ir tavs, pārbaudi programmu un grupu iestatījumos." }),
+      ...hidden.map(dlRow),
+      otherFiles.length ? el("ul", { class: "note" }, otherFiles.map(f => el("li", { text: f }))) : null);
+    hb.append(det);
+  }
+}
+
+/* ---------- jaunumi ---------- */
+async function renderChanges() {
+  const box = $("#changes-now"); box.replaceChildren();
+  const ch = VIEW.changes;
+  const counts = ch && !ch.first_run && !ch.empty ? ch.counts : [];
+  $("#cnt-new").textContent = counts.length ? String(counts.length) : "";
+  if (ch) {
+    box.append(el("h3", { text: `Pēdējā sinhronizācijā${VIEW.generated ? ", " + fmtDate(VIEW.generated) : ""}` }),
+      el("div", { class: "doc" }, md(ch.md.join("\n"))));
+    if ((VIEW.warnings || []).length || ((VIEW.report || {}).errors || []).length)
+      box.append(el("h3", { text: "Problēmas" }), el("ul", {}, [...VIEW.warnings, ...VIEW.report.errors].map(w => el("li", { text: w }))));
+  }
+  try { $("#changelog").replaceChildren(md((await api("/api/doc?name=JAUNUMI")).text)); } catch (e) { }
+}
+
+/* ---------- faili ---------- */
+async function loadFiles() {
+  try { FILES = await api("/api/files"); } catch (e) { FILES = []; }
+  renderFiles();
+}
+function renderFiles() {
+  const cats = [...new Set(FILES.map(f => f.category))].filter(Boolean).sort();
+  const ff = $("#file-filters"); ff.replaceChildren(
+    el("button", { class: "chip", type: "button", "aria-pressed": String(!ui.fileCat), onclick: () => { ui.fileCat = ""; renderFiles(); } }, "Visi"),
+    ...cats.map(c => el("button", { class: "chip", type: "button", "aria-pressed": String(ui.fileCat === c), onclick: () => { ui.fileCat = c; renderFiles(); } }, c)));
+  const rows = FILES.filter(f => !ui.fileCat || f.category === ui.fileCat);
+  const box = $("#files"); box.replaceChildren();
+  if (!rows.length) { box.append(el("div", { class: "empty", text: "Vēl nav lejupielādētu failu." })); return; }
+  box.append(el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "Fails" }), el("th", { text: "Kurss" }),
+    el("th", { text: "Kategorija" }), el("th", { text: "Lejupielādēts" }), el("th", {}))),
+    el("tbody", {}, rows.map(f => el("tr", {},
+      el("td", { class: "path", text: f.path.split("/").slice(-1)[0] }), el("td", { text: f.course }),
+      el("td", { text: f.category }), el("td", { text: f.downloaded ? fmtDate(f.downloaded) : "" }),
+      el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt")))))));
+}
+async function openPath(p) {
+  try { await post("/api/open", { path: p }); } catch (e) { toast(e.message, true); }
+}
+
+/* ---------- iestatījumi ---------- */
+async function loadConfig() {
+  CONFIG = await api("/api/config");
+  const v = CONFIG.values, f = $("#cfg-form");
+  for (const inp of $$("[name]", f)) {
+    const val = v[inp.name];
+    if (inp.type === "checkbox") inp.checked = !!val;
+    else if (Array.isArray(val)) inp.value = inp.tagName === "TEXTAREA" ? val.join("\n") : val.join(", ");
+    else inp.value = val ?? "";
+  }
+  const catBox = (id, selected) => { const b = $(id); b.replaceChildren(...CONFIG.categories.map(c =>
+    el("label", { class: "check" }, el("input", { type: "checkbox", value: c, checked: selected.includes(c) }), c))); };
+  catBox("#only-cats", v.only_categories); catBox("#drive-cats", v.drive_categories);
+  if (!VIEW.filter) $("#st-filter").textContent = v.program ? `${v.program}, ${v.group || "?"}. gr.` : "nav norādīta";
+  renderGcalRow();
+}
+function formValues() {
+  const f = $("#cfg-form"), out = {};
+  for (const inp of $$("[name]", f)) out[inp.name] = inp.type === "checkbox" ? inp.checked
+    : inp.type === "number" ? Number(inp.value) : inp.value;
+  out.only_categories = $$("#only-cats input:checked").map(i => i.value);
+  out.drive_categories = $$("#drive-cats input:checked").map(i => i.value);
+  out.exclude_courses = out.exclude_courses.split("\n").map(s => s.trim()).filter(Boolean);
+  return out;
+}
+async function saveConfig(e) {
+  e && e.preventDefault();
+  try {
+    CONFIG = await post("/api/config", formValues());
+    $("#save-state").textContent = "Saglabāts";
+    setTimeout(() => $("#save-state").textContent = "", 3000);
+    loadView();
+  } catch (err) { toast(err.message, true); }
+}
+function renderGcalRow() {
+  const row = $("#gcal-row"); if (!row) return; row.replaceChildren();
+  if (!STATUS.google_credentials) {
+    const file = el("input", { type: "file", accept: ".json,application/json", style: "display:none",
+      onchange: async () => {
+        const txt = await file.files[0].text();
+        try { await post("/api/credentials", { content: txt }); toast("credentials.json saglabāts"); loadStatus(); }
+        catch (err) { toast(err.message, true); }
+      } });
+    row.append(el("span", { class: "note", text: "Vajag Google OAuth klienta failu (Desktop app). Kā to iegūt, skat. instrukcijā." }), file,
+      el("button", { class: "btn ghost small", type: "button", onclick: () => file.click() }, "Augšupielādēt credentials.json"));
+  } else {
+    row.append(STATUS.google_token ? el("span", { class: "pill ok", text: "savienots" }) : el("span", { class: "pill warn", text: "nav savienots" }),
+      el("button", { class: "btn ghost small", type: "button", onclick: () => runJob("gcal") },
+        STATUS.google_token ? "Savienot no jauna" : "Savienot ar Google"));
+  }
+}
+function renderSchedule() {
+  const s = STATUS.schedule || {};
+  const st = $("#sched-state"), b = $("#sched-btn");
+  st.replaceChildren(s.installed ? el("span", { class: "pill ok", text: `ieslēgta: ${s.times.join(", ")}` })
+    : s.installed === false ? el("span", { class: "pill warn", text: "izslēgta" }) : el("span", { class: "pill", text: "nezināms" }));
+  b.textContent = s.installed ? "Izslēgt" : "Ieslēgt";
+  b.onclick = async () => {
+    try { if (!s.installed) await saveConfig(); const r = await post("/api/schedule", { enable: !s.installed }); toast(r.message); loadStatus(); }
+    catch (err) { toast(err.message, true); }
+  };
+}
+
+/* ---------- konts ---------- */
+function renderAccount() {
+  const a = STATUS.auth || {}, box = $("#account"); if (!box) return;
+  const kids = [el("h4", { text: "RTU konts" })];
+  if (!a.mode) {
+    kids.push(el("p", { class: "note", text: "Nav pieteicies. Ieraksti e-pastu iestatījumos un spied pogu: atvērsies Microsoft logs." }),
+      el("div", { class: "row" }, el("button", { class: "btn", type: "button", onclick: startLogin }, "Pieteikties")));
+  } else {
+    const days = a.obtained ? Math.round((Date.now() - new Date(a.obtained)) / 86400000) : null;
+    kids.push(el("table", {}, el("tbody", {},
+      el("tr", {}, el("td", { text: "Lietotājs" }), el("td", { text: a.fullname || VIEW.user || "—" })),
+      el("tr", {}, el("td", { text: "Režīms" }), el("td", {}, a.mode === "api"
+        ? el("span", { class: "pill ok", text: "API, bez pārlūka" }) : el("span", { class: "pill warn", text: "pārlūka sesija" }))),
+      el("tr", {}, el("td", { text: "Pieteicies" }), el("td", { text: a.obtained ? `${fmtDate(a.obtained)} (pirms ${days} d.)` : "—" })))),
+      el("div", { class: "row" },
+        el("button", { class: "btn ghost", type: "button", onclick: startLogin }, "Pieteikties no jauna"),
+        el("button", { class: "btn danger small", type: "button", onclick: async () => {
+          if (!confirm("Izdzēst saglabāto piekļuvi šajā datorā?")) return;
+          await post("/api/logout"); toast("Piekļuve izdzēsta"); loadStatus(); renderDeadlines();
+        } }, "Aizmirst piekļuvi")));
+  }
+  box.replaceChildren(...kids);
+}
+
+/* ---------- darbi ---------- */
+async function runJob(name) {
+  try { await post(`/api/job/${name}`); setTimeout(loadStatus, 200); }
+  catch (e) { toast(e.message, true); }
+}
+const startSync = () => runJob("sync");
+const startLogin = () => { toast("Atveras Microsoft pieteikšanās logs…"); runJob("login"); };
+function renderLastJob() {
+  const j = STATUS.last_job, box = $("#lastjob"); box.replaceChildren();
+  if (j) box.append(el("div", { class: "panel" }, el("h4", { text: `${j.name}, ${fmtDate(j.finished)}` }),
+    el("pre", { style: "white-space:pre-wrap;margin:0;font:14px/1.5 var(--font)", text: j.message }),
+    el("span", { class: "pill " + (j.ok ? "ok" : "bad"), text: j.ok ? "izdevās" : "neizdevās" })));
+}
+async function loadLog() { try { $("#log").textContent = (await api("/api/log")).text || "Žurnāls ir tukšs."; } catch (e) { } }
+
+/* ---------- cilnes ---------- */
+function showTab(name) {
+  $$("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
+  $$("section[data-panel]").forEach(s => s.hidden = s.dataset.panel !== name);
+  if (name === "readme" && !$("#readme").childElementCount) api("/api/doc?name=README").then(r => $("#readme").replaceChildren(md(r.text)));
+  if (name === "zurnals") loadLog();
+  if (name === "faili") loadFiles();
+  try { localStorage.setItem("tab", name); } catch (e) { }
+}
+
+/* ---------- start ---------- */
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
+$("#btn-sync").addEventListener("click", startSync);
+$("#q").addEventListener("input", e => { ui.q = e.target.value; renderDeadlines(); });
+$("#show-done").addEventListener("change", e => { ui.showDone = e.target.checked; renderDeadlines(); renderTimeline(); });
+$("#show-text").addEventListener("change", e => { ui.showText = e.target.checked; renderDeadlines(); renderTimeline(); });
+$("#cfg-form").addEventListener("submit", saveConfig);
+$("#open-out").addEventListener("click", () => openPath(""));
+$("#open-config").addEventListener("click", () => openPath("@config"));
+$("#open-data").addEventListener("click", () => openPath("@data"));
+$("#reload-log").addEventListener("click", loadLog);
+$("#btn-update").addEventListener("click", () => runJob("update"));
+$("#ics-link").addEventListener("click", async e => {
+  e.preventDefault();
+  try {
+    const r = await fetch("/api/ics", { headers: { "X-Token": TOKEN } });
+    if (!r.ok) throw new Error("termini.ics vēl nav izveidots — sinhronizē vispirms");
+    const url = URL.createObjectURL(await r.blob());
+    el("a", { href: url, download: "termini.ics" }).click(); URL.revokeObjectURL(url);
+  } catch (err) { toast(err.message, true); }
+});
+$("#detect-drive").addEventListener("click", async () => {
+  const box = $("#drive-suggest"); box.replaceChildren();
+  const found = await api("/api/drive/detect");
+  if (!found.length) { box.append(el("span", { class: "hint", text: "Neatradu. Instalē Google Drive for desktop vai ieraksti ceļu pats." })); return; }
+  found.forEach(f => box.append(el("button", { type: "button", onclick: () => { $("#f-dfolder").value = f.suggest; $("#f-drive").checked = true; } },
+    `${f.kind}: ${f.suggest}`)));
+});
+$("#theme").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("theme", next); } catch (e) { }
+});
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) { }
+
+renderKindFilters();
+(async () => {
+  await loadStatus();
+  await loadConfig().catch(() => { });
+  await loadView();
+  let tab = "termini"; try { tab = localStorage.getItem("tab") || tab; } catch (e) { }
+  showTab($(`#tabs button[data-tab="${tab}"]`) ? tab : "termini");
+})();
+</script>
+</body>
+</html>

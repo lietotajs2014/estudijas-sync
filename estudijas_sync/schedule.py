@@ -35,6 +35,21 @@ def install(cfg: Config) -> str:
     return _install_cron(cfg)
 
 
+def status(cfg: Config) -> bool | None:
+    """True/False — vai automātiskā palaišana ir iestatīta; None — nevar noteikt."""
+    try:
+        if platform.system() == "Windows":
+            r = subprocess.run(["schtasks", "/Query", "/TN", _task_name(cfg)], capture_output=True, text=True,
+                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            return r.returncode == 0
+        if not shutil.which("crontab"):
+            return None
+        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        return r.returncode == 0 and f"# estudijas-sync:{cfg.profile}" in r.stdout
+    except Exception:
+        return None
+
+
 def uninstall(cfg: Config) -> str:
     if platform.system() == "Windows":
         r = subprocess.run(["powershell", "-NoProfile", "-Command",

@@ -113,6 +113,13 @@ def interactive_login(cfg: Config, force_web: bool = False) -> dict:
         try:
             page = ctx.pages[0] if ctx.pages else ctx.new_page()
             page.goto(site + "/my/")
+            if cfg.email:
+                try:  # aizpilda e-pastu Microsoft logā (paroli ievadi pats)
+                    page.wait_for_selector("input[type=email]", timeout=20000)
+                    page.fill("input[type=email]", cfg.email)
+                    page.keyboard.press("Enter")
+                except Exception:
+                    pass
             print("\n➡  Pārlūkā piesakies ar RTU e-pastu (Microsoft). Ja jautā 'Stay signed in?', spied 'Yes'.")
             print("   Gaidu līdz 10 minūtēm…")
             sesskey = wait_logged_in(page, site, 600)

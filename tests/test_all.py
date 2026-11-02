@@ -192,7 +192,7 @@ def test_full_sync(tmp_path=None):
     dg = (out / "UZDEVUMI.md").read_text(encoding="utf-8")
     top, hidden = dg.split("<details><summary>Citām grupām")[0], dg.split("<details><summary>Citām grupām")[1]
     assert "LD1 atskaite" not in top and "MD1 (1. grupai)" not in top and "LD1 atskaite" in hidden
-    assert "atlase: **RMCE0 · 3. grupa**" in dg
+    assert "atlase: **RMCE0, 3. grupa**" in dg
     assert "LD1 atskaite" not in (out / "termini.ics").read_text(encoding="utf-8")
     digest = (out / "UZDEVUMI.md").read_text(encoding="utf-8")
     assert "MD1 — Kirhofa likumi" in digest and "Tests 1" in digest
@@ -243,6 +243,42 @@ def test_full_sync(tmp_path=None):
     assert sorted(downloads) == ["MD1.pdf", "MD1_uzdevumi.pdf"], downloads   # bez program: nekas netiek atlasīts
     assert (cfg2.output_dir / "UZDEVUMI.md").exists()
     print((out / "UZDEVUMI.md").read_text(encoding="utf-8")[:1500])
+
+
+def test_webui():
+    import json as _json
+    import threading
+    import urllib.request
+    from estudijas_sync.webui import serve
+    holder, ready = [], threading.Event()
+    threading.Thread(target=serve, args=("webtest", None), kwargs=dict(port=8931, open_browser=False, ready=ready,
+                     app_holder=holder), daemon=True).start()
+    assert ready.wait(10)
+    app = holder[0]
+    base = f"http://127.0.0.1:{app.port}"
+
+    def req(path, body=None, token=True):
+        r = urllib.request.Request(base + path, data=_json.dumps(body).encode() if body is not None else None,
+                                   headers={"X-Token": app.token if token else "x", "Content-Type": "application/json"},
+                                   method="POST" if body is not None else "GET")
+        try:
+            with urllib.request.urlopen(r) as resp:
+                return resp.status, resp.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.read().decode()
+    code, html = req("/")
+    assert code == 200 and app.token in html
+    assert req("/api/status", token=False)[0] == 401
+    code, st = req("/api/status")
+    assert code == 200 and _json.loads(st)["profile"] == "webtest"
+    code, cfgj = req("/api/config", {"program": "rmce0", "group": "3. grupa", "schedule_times": "08:00, 20:00",
+                                     "drive_enabled": True, "drive_categories": ["Mājas darbi"], "notify": False})
+    v = _json.loads(cfgj)["values"]
+    assert code == 200 and v["program"] == "RMCE0" and v["group"] == "3" and v["schedule_times"] == ["08:00", "20:00"]
+    assert v["drive_enabled"] is True and v["notify"] is False
+    assert req("/api/config", {"schedule_times": "25:99"})[0] == 400
+    assert req("/api/open", {"path": "../../etc"})[0] == 400
+    assert _json.loads(req("/api/view")[1]) == {}
 
 
 if __name__ == "__main__":
