@@ -88,13 +88,18 @@ To pašu var izdarīt web panelī: `python run.py web` vai `start.bat`.
 
 Konfigurācija atrodas `~/.estudijas_sync/default/config.toml` (Windows: `C:\Users\<tu>\.estudijas_sync\default\config.toml`). Tajā var iestatīt:
 
-- `output_dir` — kur likt failus;
+- `output_dir` — kur likt failus. Mapi ērtāk mainīt panelī (*Iestatījumi → Mape → Izvēlēties…*) vai ar `python run.py set-folder`, jo tad jau lejupielādētos failus var pārvietot uz jauno vietu;
 - `exclude_courses` — kursus, kurus nevajag;
 - `program` / `group` — tavu programmu un grupu (iestata `init`);
 - `[categories]` — mapju noteikumus;
 - `[schedule] times` — palaišanas laikus.
 
 Palaižot `sync` pats, terminālī redzama **progresa josla**: kursu nolasīšana, tad lejupielāde ar MB. Beigās skripts parāda, kas jauns. Automātiskās palaišanas strādā klusi; joslu var izslēgt arī ar `sync -q`.
+
+**Mapes maiņa:**
+- `python run.py set-folder` — atver mapes izvēles logu;
+- `python run.py set-folder "D:\RTU estudijas"` — pārvieto jau lejupielādētos failus uz norādīto mapi;
+- `... --redownload` — nepārvieto, bet nākamajā sinhronizācijā lejupielādē visu no jauna.
 
 Citas komandas:
 - `python run.py update` — atjaunina skriptu uz jaunāko versiju no GitHub (`git pull`; vajadzības gadījumā atjaunina arī bibliotēkas);

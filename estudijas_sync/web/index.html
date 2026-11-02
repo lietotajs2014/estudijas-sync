@@ -171,6 +171,12 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .suggest { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .suggest button { text-align: left; border: 1px dashed var(--line); background: none; padding: 4px 8px; cursor: pointer; font-size: 13px; border-radius: var(--radius-s); }
+.folder-row { display: flex; gap: 8px; align-items: center; }
+.folder-row input { flex: 1; min-width: 0; }
+.move-box { margin-top: 10px; padding: 12px 14px; border: 2px solid var(--md); border-radius: var(--radius-m); background: color-mix(in srgb, var(--md) 7%, transparent); }
+.move-box p { margin: 0 0 6px; }
+.move-box .row { margin-top: 4px; }
+.move-box[hidden] { display: none; }
 .savebar { position: sticky; bottom: 0; background: var(--paper); border-top: 2px solid var(--ink); padding: 12px 0; display: flex; gap: 12px; align-items: center; margin-top: 8px; }
 .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 13px; border: 1px solid currentColor; }
 .pill.ok { color: var(--ok); } .pill.bad { color: var(--bad); } .pill.warn { color: var(--warn); }
@@ -273,6 +279,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
       <div class="filters">
         <button class="btn small" id="open-out" type="button">Atvērt mapi</button>
         <span class="muted" id="out-path"></span>
+        <button class="btn ghost small" id="goto-folder" type="button">Mainīt mapi</button>
       </div>
       <div class="filters" id="file-filters"></div>
       <div id="files"></div>
@@ -303,9 +310,25 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 
         <div class="panel">
           <h4>Faili datorā</h4>
-          <div class="form-grid">
-            <div class="field"><label for="f-out">Mape</label>
-              <input type="text" id="f-out" name="output_dir"></div>
+          <div class="field folder-field">
+            <label for="f-out">Mape, kurā tiek lejupielādēti faili</label>
+            <div class="folder-row">
+              <input type="text" id="f-out" data-ignore="1" spellcheck="false" placeholder="D:/RTU estudijas">
+              <button class="btn ghost small" type="button" id="pick-folder">Izvēlēties…</button>
+              <button class="btn ghost small" type="button" id="open-out2">Atvērt</button>
+            </div>
+            <div class="hint">Izvēlies mapi vai ieraksti ceļu. Pēc tam izlem, ko darīt ar jau lejupielādētajiem failiem.</div>
+            <div class="move-box" id="move-box" hidden>
+              <p>Mainīt mapi uz <b id="move-to"></b>?</p>
+              <div class="row">
+                <button class="btn small" type="button" data-mode="move">Pārvietot esošos failus</button>
+                <button class="btn ghost small" type="button" data-mode="redownload">Lejupielādēt no jauna</button>
+                <button class="btn ghost small" type="button" id="move-cancel">Atcelt</button>
+              </div>
+              <p class="hint">"Pārvietot" pārnes jau lejupielādētos failus, kopsavilkumus un kursu piezīmes. "Lejupielādēt no jauna" vecos atstāj, kur ir, un nākamajā sinhronizācijā visu lejupielādē jaunajā mapē.</p>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:14px">
             <div class="field"><label for="f-max">Maksimālais faila izmērs, MB</label>
               <input type="number" id="f-max" name="download_max_mb" min="1"></div>
             <div class="field"><label for="f-excl">Izslēgtie kursi</label>
@@ -735,6 +758,7 @@ async function loadConfig() {
   const catBox = (id, selected) => { const b = $(id); b.replaceChildren(...CONFIG.categories.map(c =>
     el("label", { class: "check" }, el("input", { type: "checkbox", value: c, checked: selected.includes(c) }), c))); };
   catBox("#only-cats", v.only_categories); catBox("#drive-cats", v.drive_categories);
+  $("#f-out").value = v.output_dir; $("#move-box").hidden = true;
   if (!VIEW.filter) $("#st-filter").textContent = v.program ? `${v.program}, ${v.group || "?"}. gr.` : "nav norādīta";
   renderGcalRow();
 }
@@ -842,6 +866,7 @@ $("#show-done").addEventListener("change", e => { ui.showDone = e.target.checked
 $("#show-text").addEventListener("change", e => { ui.showText = e.target.checked; renderDeadlines(); renderTimeline(); });
 $("#cfg-form").addEventListener("submit", saveConfig);
 $("#open-out").addEventListener("click", () => openPath(""));
+$("#goto-folder").addEventListener("click", () => { showTab("iestatijumi"); $("#f-out").focus(); });
 $("#open-config").addEventListener("click", () => openPath("@config"));
 $("#open-data").addEventListener("click", () => openPath("@data"));
 $("#reload-log").addEventListener("click", loadLog);
@@ -855,6 +880,33 @@ $("#ics-link").addEventListener("click", async e => {
     el("a", { href: url, download: "termini.ics" }).click(); URL.revokeObjectURL(url);
   } catch (err) { toast(err.message, true); }
 });
+/* mapes maiņa */
+function proposeFolder(path) {
+  path = (path || "").trim();
+  if (!path || !CONFIG || path === CONFIG.values.output_dir) { $("#move-box").hidden = true; return; }
+  $("#f-out").value = path; $("#move-to").textContent = path; $("#move-box").hidden = false;
+}
+$("#pick-folder").addEventListener("click", async () => {
+  const b = $("#pick-folder"); b.disabled = true; b.textContent = "Atver logu…";
+  try {
+    const r = await post("/api/pick-folder", { initial: CONFIG ? CONFIG.values.output_dir : "" });
+    if (r.path) proposeFolder(r.path);
+  } catch (e) { toast(e.message, true); }
+  finally { b.disabled = false; b.textContent = "Izvēlēties…"; }
+});
+$("#f-out").addEventListener("change", e => proposeFolder(e.target.value));
+$("#f-out").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); proposeFolder(e.target.value); } });
+$("#move-cancel").addEventListener("click", () => { $("#f-out").value = CONFIG.values.output_dir; $("#move-box").hidden = true; });
+$$("#move-box [data-mode]").forEach(btn => btn.addEventListener("click", async () => {
+  $$("#move-box button").forEach(x => x.disabled = true);
+  try {
+    const r = await post("/api/change-folder", { path: $("#f-out").value, mode: btn.dataset.mode });
+    toast(r.message);
+    await loadConfig(); loadStatus(); loadFiles();
+  } catch (e) { toast(e.message, true); }
+  finally { $$("#move-box button").forEach(x => x.disabled = false); }
+}));
+$("#open-out2").addEventListener("click", () => openPath(""));
 $("#detect-drive").addEventListener("click", async () => {
   const box = $("#drive-suggest"); box.replaceChildren();
   const found = await api("/api/drive/detect");

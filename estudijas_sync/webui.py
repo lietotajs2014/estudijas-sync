@@ -35,7 +35,6 @@ FIELDS: dict[str, tuple[str | None, str, str]] = {
     "email": (None, "email", "str"),
     "program": (None, "program", "upper"),
     "group": (None, "group", "group"),
-    "output_dir": (None, "output_dir", "str"),
     "other_groups": (None, "other_groups", "other"),
     "exclude_courses": (None, "exclude_courses", "list"),
     "only_categories": (None, "only_categories", "list"),
@@ -408,13 +407,22 @@ def make_handler(app: App):
                     return self._json({"ok": True, "message": msg, "installed": schedule.status(cfg)})
                 if u.path == "/api/open":
                     return self._json({"ok": True, "path": app.open_path(str(body.get("path", "")))})
+                if u.path == "/api/pick-folder":
+                    from .relocate import pick_folder
+                    return self._json({"ok": True, "path": pick_folder(str(body.get("initial") or ""))})
+                if u.path == "/api/change-folder":
+                    if app.job:
+                        return self._json({"ok": False, "error": f"Pagaidi, kamēr beigsies: {app.job['name']}"}, 409)
+                    from .relocate import change_folder
+                    return self._json({"ok": True, **change_folder(app.cfg(), str(body.get("path", "")),
+                                                                    str(body.get("mode", "move")))})
                 if u.path == "/api/credentials":
                     return self._json({"ok": True, "path": app.save_credentials(str(body.get("content", "")))})
                 if u.path == "/api/logout":
                     from .config import auth_path
                     auth_path(app.cfg()).unlink(missing_ok=True)
                     return self._json({"ok": True})
-            except (ValueError, PermissionError, FileNotFoundError, json.JSONDecodeError) as e:
+            except (ValueError, PermissionError, FileNotFoundError, json.JSONDecodeError, RuntimeError) as e:
                 return self._json({"ok": False, "error": str(e)}, 400)
             except Exception as e:
                 log.exception("POST %s", u.path)

@@ -290,6 +290,38 @@ def test_web_login_popup_flow():
         pa.sync_playwright = orig
 
 
+def test_change_folder():
+    from estudijas_sync.config import State, save_auth
+    from estudijas_sync.relocate import change_folder
+    tmp = Path(tempfile.mkdtemp())
+    cfg = load_config("relocate")
+    from estudijas_sync.config import set_toml_values
+    set_toml_values(cfg.config_path, {(None, "output_dir"): str(tmp / "old")})
+    cfg = load_config("relocate")
+    (tmp / "old" / "Kurss" / "Lekcijas").mkdir(parents=True)
+    (tmp / "old" / "Kurss" / "Lekcijas" / "L1.pdf").write_text("a")
+    (tmp / "old" / "Kurss" / "_info").mkdir()
+    (tmp / "old" / "Kurss" / "_info" / "Paziņojumi.md").write_text("b")
+    (tmp / "old" / "UZDEVUMI.md").write_text("c")
+    (tmp / "old" / "mans_fails.txt").write_text("neaiztikt")
+    st = State(cfg.data_dir / "state.json")
+    st.files["k"] = {"version": "1", "path": "Kurss/Lekcijas/L1.pdf"}
+    st.save()
+    r = change_folder(cfg, str(tmp / "new"), "move")
+    assert (tmp / "new" / "Kurss" / "Lekcijas" / "L1.pdf").exists()
+    assert (tmp / "new" / "Kurss" / "_info" / "Paziņojumi.md").exists() and (tmp / "new" / "UZDEVUMI.md").exists()
+    assert (tmp / "old" / "mans_fails.txt").exists() and not (tmp / "old" / "Kurss").exists(), r
+    assert load_config("relocate").output_dir == tmp / "new"
+    r2 = change_folder(load_config("relocate"), str(tmp / "third"), "redownload")
+    assert State(cfg.data_dir / "state.json").files == {} and load_config("relocate").output_dir == tmp / "third"
+    for bad in ("relatīvs/ceļš", str(tmp / "third" / "iekšā")):
+        try:
+            change_folder(load_config("relocate"), bad, "move")
+            raise AssertionError(bad)
+        except ValueError:
+            pass
+
+
 def test_webui():
     import json as _json
     import threading

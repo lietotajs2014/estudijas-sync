@@ -100,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("install-schedule", help="palaist automātiski (laiki no konfigurācijas)")
     sub.add_parser("uninstall-schedule", help="noņemt automātisko palaišanu")
     sub.add_parser("update", help="atjaunināt skriptu uz jaunāko versiju (git pull)")
+    fp = sub.add_parser("set-folder", help="nomainīt mapi, kurā tiek lejupielādēti faili")
+    fp.add_argument("path", nargs="?", help="jaunā mape (ja nav norādīta — atver izvēles logu)")
+    g = fp.add_mutually_exclusive_group()
+    g.add_argument("--move", action="store_true", help="pārvietot jau lejupielādētos failus (noklusējums)")
+    g.add_argument("--redownload", action="store_true", help="nepārvietot; nākamreiz lejupielādēt visu no jauna")
     wp = sub.add_parser("web", help="atvērt web paneli pārlūkā")
     wp.add_argument("--port", type=int, default=8765)
     wp.add_argument("--no-browser", action="store_true")
@@ -132,6 +137,26 @@ def main(argv: list[str] | None = None) -> int:
         from .webui import serve
         serve(cfg.profile, Path(args.config).expanduser() if args.config else None,
               port=args.port, open_browser=not args.no_browser)
+        return 0
+
+    if args.cmd == "set-folder":
+        from .relocate import change_folder, pick_folder
+        path = args.path
+        if not path:
+            try:
+                path = pick_folder(str(cfg.output_dir))
+            except RuntimeError as e:
+                print(f"✖ {e}")
+                return 1
+            if not path:
+                print("Atcelts.")
+                return 0
+        try:
+            r = change_folder(cfg, path, "redownload" if args.redownload else "move")
+        except ValueError as e:
+            print(f"✖ {e}")
+            return 1
+        print(f"✔ {r['message']}\n  Jaunā mape: {r['path']}")
         return 0
 
     if args.cmd == "update":
