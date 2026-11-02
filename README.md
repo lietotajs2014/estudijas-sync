@@ -155,11 +155,11 @@ Lietotne strādā patstāvīgi, dators tai nav vajadzīgs. Tā rāda:
 
 **Instalēšana:**
 
-1. Telefonā atver repozitorija lapu → **Releases** → *Android lietotne (jaunākā)* → lejupielādē **RTU-estudijas.apk**. Repozitorijs ir privāts, tāpēc jābūt ielogotam GitHub ar kontu, kam ir piekļuve.
+1. Lejupielādē **RTU-estudijas.apk**: repozitorija lapā → **Actions** → *Android APK* → jaunākais zaļais palaidums → *Artifacts* → *RTU-estudijas-apk* (ZIP, iekšā APK). Repozitorijs ir privāts, tāpēc jābūt ielogotam GitHub ar kontu, kam ir piekļuve.
 2. Atver lejupielādēto failu. Ja Android jautā, atļauj instalēt lietotnes no šī avota (pārlūka).
 3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu). Pieslēgšanās atveras pārlūkā (tur strādā saglabātās paroles), un pēc tās pārlūks atgriežas lietotnē. Ja pārlūks paliek estudiju lapā, atgriezies lietotnē un spied **Pabeigt pieslēgšanos**. Ja telefonā ir arī oficiālā Moodle lietotne, Android var pajautāt, ar ko atvērt, un tad izvēlies *RTU estudijas*.
 
-Jaunāku versiju instalē tāpat, virsū vecajai, un dati saglabājas. Katru reizi, kad repozitorijā mainās `android/` mape, GitHub Actions automātiski uzbūvē jaunu APK.
+Jaunāku versiju instalē tāpat, virsū vecajai, un dati saglabājas. Katru reizi, kad repozitorijā mainās `android/` mape, GitHub Actions automātiski uzbūvē jaunu APK (tas glabājas 30 dienas).
 
 Sinhronizācija notiek, atverot lietotni (ja pēdējā bija pirms 30+ minūtēm), vai ar pogu augšā. Termiņu var ielikt telefona kalendārā ar pogu "Pievienot kalendāram". Automātiskais Google Calendar 2× dienā joprojām nāk no datora programmas.
 

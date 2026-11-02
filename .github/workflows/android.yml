@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: android
@@ -59,17 +59,4 @@ jobs:
         with:
           name: RTU-estudijas-apk
           path: ${{ runner.temp }}/RTU-estudijas.apk
-
-      - name: Publicē Releases
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-latest
-          name: "Android lietotne (jaunākā)"
-          prerelease: false
-          make_latest: true
-          files: ${{ runner.temp }}/RTU-estudijas.apk
-          body: |
-            RTU estudijas — Android lietotne. Versija 1.0.${{ github.run_number }} (${{ github.sha }}).
-
-            Instalēšana: lejupielādē **RTU-estudijas.apk** telefonā un atver to (atļauj instalēt no šī avota).
-            Jaunāku versiju var instalēt virsū — dati saglabājas.
+          retention-days: 30
