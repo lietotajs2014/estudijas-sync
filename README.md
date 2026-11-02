@@ -157,7 +157,7 @@ Lietotne strādā patstāvīgi, dators tai nav vajadzīgs. Tā rāda:
 
 1. Telefonā atver repozitorija lapu → **Releases** → *Android lietotne (jaunākā)* → lejupielādē **RTU-estudijas.apk**. Repozitorijs ir privāts, tāpēc jābūt ielogotam GitHub ar kontu, kam ir piekļuve.
 2. Atver lejupielādēto failu. Ja Android jautā, atļauj instalēt lietotnes no šī avota (pārlūka).
-3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu).
+3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu). Pieslēgšanās atveras pārlūkā (tur strādā saglabātās paroles), un pēc tās pārlūks atgriežas lietotnē. Ja pārlūks paliek estudiju lapā, atgriezies lietotnē un spied **Pabeigt pieslēgšanos**. Ja telefonā ir arī oficiālā Moodle lietotne, Android var pajautāt, ar ko atvērt, un tad izvēlies *RTU estudijas*.
 
 Jaunāku versiju instalē tāpat, virsū vecajai, un dati saglabājas. Katru reizi, kad repozitorijā mainās `android/` mape, GitHub Actions automātiski uzbūvē jaunu APK.
 

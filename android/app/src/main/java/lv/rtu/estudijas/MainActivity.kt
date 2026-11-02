@@ -17,7 +17,6 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import org.json.JSONObject
-import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
@@ -28,7 +27,6 @@ const val USER_AGENT = "Mozilla/5.0 (Linux; Android) estudijas-sync-android Mood
 class MainActivity : Activity() {
     private lateinit var web: WebView
     private val pool = Executors.newFixedThreadPool(6)
-    private val storeDir by lazy { File(filesDir, "store").apply { mkdirs() } }
     private var resumedOnce = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,6 +56,21 @@ class MainActivity : Activity() {
         web.addJavascriptInterface(Bridge(), "Native")
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl("file:///android_asset/web/index.html")
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        deliverLogin(intent)
+    }
+
+    /** Žetons no TokenActivity (pieteikšanās pārlūkā). */
+    private fun deliverLogin(intent: Intent?) {
+        if (intent == null || !(intent.hasExtra("token") || intent.hasExtra("error"))) return
+        val token = intent.getStringExtra("token") ?: ""
+        val priv = intent.getStringExtra("private") ?: ""
+        val err = intent.getStringExtra("error") ?: ""
+        intent.removeExtra("token"); intent.removeExtra("error")
+        js("window.__onLogin && window.__onLogin(${q(token)}, ${q(priv)}, ${q(err)})")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -108,8 +121,6 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun keyFile(key: String) = File(storeDir, key.replace(Regex("[^A-Za-z0-9_-]"), "_") + ".json")
-
     inner class Bridge {
         /** HTTP pieprasījums uz estudijas.rtu.lv (tikai turp). Rezultāts — window.__nativeResult(id, status, text). */
         @JavascriptInterface
@@ -144,22 +155,18 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
-        fun load(key: String): String? = keyFile(key).takeIf { it.exists() }?.readText()
+        fun load(key: String): String? = Store.load(this@MainActivity, key)
 
         @JavascriptInterface
-        fun save(key: String, value: String) {
-            val f = keyFile(key)
-            if (value.isEmpty()) { f.delete(); return }
-            val tmp = File(f.path + ".tmp")
-            tmp.writeText(value)
-            tmp.renameTo(f)
-        }
+        fun save(key: String, value: String) = Store.save(this@MainActivity, key, value)
 
         @JavascriptInterface
         fun openUrl(url: String) = runOnUiThread { openExternal(url) }
 
+        /** mode "browser" — pārlūkā (saglabātās paroles); "app" — lietotnes iekšējā logā. */
         @JavascriptInterface
-        fun login(email: String) = runOnUiThread {
+        fun login(email: String, mode: String) = runOnUiThread {
+            if (mode == "browser" && openBrowserLogin(this@MainActivity)) return@runOnUiThread
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(this@MainActivity, LoginActivity::class.java).putExtra("email", email), REQ_LOGIN)
         }

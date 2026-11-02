@@ -141,11 +141,25 @@ async function runSync(manual) {
 }
 
 /* ---------- pieteikšanās ---------- */
-function login() {
+let loginPending = 0;
+function login(mode) {
+  mode = mode === "app" ? "app" : "browser";
   if (!N) { const t = prompt("Moodle tokens (testēšanai pārlūkā):"); if (t) window.__onLogin(t, ""); return; }
-  N.login(S.settings.email || "");
+  loginPending = mode === "browser" ? Date.now() : 0;
+  N.login(S.settings.email || "", mode);
+}
+// Atgriežoties no pārlūka bez žetona (piem., pēc pieteikšanās atvērās estudiju sākumlapa)
+function loginNotFinished() {
+  openSheet(el("span", { class: "kind", style: "--c:var(--warn)", text: "Pieslēgšanās" }), "Pieslēgšanās nav pabeigta", [
+    el("p", { text: "Ja pārlūkā jau ielogojies un redzēji estudiju lapu, spied “Pabeigt pieslēgšanos” — pārlūks uzreiz atgriezīsies lietotnē." }),
+    el("div", { class: "btns" },
+      el("button", { class: "btn", type: "button", text: "Pabeigt pieslēgšanos", onclick: () => { closeSheet(); login("browser"); } }),
+      el("button", { class: "btn ghost", type: "button", text: "Atcelt", onclick: () => { loginPending = 0; closeSheet(); } })),
+    el("p", { class: "small muted" }, "Neizdodas? ",
+      el("a", { href: "#", text: "Pieslēgties lietotnes iekšienē", onclick: e => { e.preventDefault(); closeSheet(); login("app"); } }))]);
 }
 window.__onLogin = (token, privatetoken, err) => {
+  loginPending = 0;
   if (!token) { if (err) toast(err, true); return; }
   S.auth = { token, privatetoken: privatetoken || "" };
   store.set("auth", S.auth);
@@ -372,9 +386,9 @@ function renderSettings() {
   acc.replaceChildren(el("h3", { text: "Konts" }));
   if (S.auth) {
     acc.append(el("p", {}, "Pieslēdzies kā ", el("b", { text: (S.view && S.view.user) || "…" })),
-      el("div", { class: "btns" }, el("button", { class: "btn ghost", type: "button", onclick: login, text: "Pieslēgties no jauna" }),
+      el("div", { class: "btns" }, el("button", { class: "btn ghost", type: "button", onclick: () => login("browser"), text: "Pieslēgties no jauna" }),
         el("button", { class: "btn danger", type: "button", onclick: () => { if (confirm("Atslēgties un izdzēst datus no šī telefona?")) logout(); }, text: "Atslēgties" })));
-  } else acc.append(el("button", { class: "btn wide", type: "button", onclick: login, text: "Pieslēgties" }));
+  } else acc.append(el("button", { class: "btn wide", type: "button", onclick: () => login("browser"), text: "Pieslēgties" }));
   $("#version").textContent = "Versija " + (N && N.version ? N.version() : "web");
   const w = (S.view && S.view.warnings) || [];
   $("#warnings").replaceChildren(...(w.length ? [el("div", { class: "warn-box" }, el("b", { text: "Pēdējā sinhronizācijā: " }), w.join("; "))] : []));
@@ -398,12 +412,15 @@ window.__onBack = () => {           // Android "atpakaļ" poga: true — apstrā
   if (S.auth && S.tab !== "deadlines") { showTab("deadlines"); return true; }
   return false;
 };
-window.__onResume = () => { if (S.view) $("#stamp").textContent = `Sinhronizēts ${ago(S.view.generated)}` + (S.view.filter ? ` · ${S.view.filter}` : ""); autoSync(); };
+window.__onResume = () => {
+  if (loginPending && Date.now() - loginPending > 1500 && Date.now() - loginPending < 30 * 6e4) loginNotFinished();
+  if (S.view) $("#stamp").textContent = `Sinhronizēts ${ago(S.view.generated)}` + (S.view.filter ? ` · ${S.view.filter}` : ""); autoSync(); };
 function autoSync() { if (S.auth && S.settings.auto !== false && (!S.view || Date.now() - S.view.generated > 30 * 6e4)) runSync(false); }
 
 /* ---------- notikumi ---------- */
 $("#btn-sync").addEventListener("click", () => runSync(true));
-$("#btn-login").addEventListener("click", () => { saveSettings("w"); login(); });
+$("#btn-login").addEventListener("click", () => { saveSettings("w"); login("browser"); });
+$("#btn-login-app").addEventListener("click", e => { e.preventDefault(); saveSettings("w"); login("app"); });
 $("#btn-save").addEventListener("click", () => { saveSettings("s"); toast("Saglabāts"); runSync(true); });
 $("#btn-past").addEventListener("click", () => { S.dl.past = !S.dl.past; renderDeadlines(); });
 $("#f-course").addEventListener("change", e => { S.dl.course = e.target.value; renderDeadlines(); });

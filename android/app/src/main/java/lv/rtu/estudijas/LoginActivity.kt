@@ -4,8 +4,8 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
-import android.util.Base64
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -22,8 +22,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import org.json.JSONObject
-import java.security.MessageDigest
-import java.security.SecureRandom
 
 /**
  * Pieteikšanās estudijās ar RTU (Microsoft) kontu tāpat kā oficiālajā Moodle lietotnē:
@@ -33,7 +31,8 @@ import java.security.SecureRandom
 class LoginActivity : Activity() {
     private lateinit var web: WebView
     private lateinit var progress: ProgressBar
-    private val passport = (100_000_000 + SecureRandom().nextInt(899_999_999)).toString()
+    private val launch = launchUrl()
+    private var relaunches = 0
     private var done = false
     private var email = ""
 
@@ -58,6 +57,7 @@ class LoginActivity : Activity() {
         }
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply { max = 100 }
         web = WebView(this)
+        web.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_YES
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(bar, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
@@ -99,6 +99,17 @@ class LoginActivity : Activity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (done) return
+                // Pēc Microsoft pieteikšanās estudijas bieži atver sākumlapu, nevis atgriežas pie launch.php —
+                // tad launch.php atver vēlreiz (sesija jau ir, tāpēc tas uzreiz atdod žetonu).
+                val u = Uri.parse(url)
+                val path = u.path ?: ""
+                if (u.host == SITE_HOST && !path.startsWith("/login") && !path.startsWith("/auth/") &&
+                    path != LAUNCH_PATH && relaunches < 2
+                ) {
+                    relaunches++
+                    view.loadUrl(launch)
+                    return
+                }
                 // dažkārt žetons ir lapas saitē, nevis pāradresācijā
                 view.evaluateJavascript(
                     "(function(){var m=document.documentElement.innerHTML.match(/[a-z][a-z0-9+.-]*:\\/\\/token=[A-Za-z0-9+\\/=_-]+/);return m?m[0]:''})()"
@@ -116,33 +127,21 @@ class LoginActivity : Activity() {
                 if (request.isForMainFrame) intercept(request.url.toString())
             }
         }
-        web.loadUrl(
-            "https://$SITE_HOST/admin/tool/mobile/launch.php?service=moodle_mobile_app" +
-                "&passport=$passport&urlscheme=moodlemobile"
-        )
+        web.loadUrl(launch)
     }
 
     /** true — URL apstrādāts (žetons vai ne-http shēma). */
     private fun intercept(url: String): Boolean {
         if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("about:")) return false
         if (done) return true
-        val m = Regex("token=([A-Za-z0-9+/=_-]+)").find(url) ?: return true
         try {
-            var b64 = m.groupValues[1]
-            b64 += "=".repeat((4 - b64.length % 4) % 4)
-            val flags = if (b64.contains('-') || b64.contains('_')) Base64.URL_SAFE else Base64.DEFAULT
-            val parts = String(Base64.decode(b64, flags), Charsets.UTF_8).split(":::")
-            if (parts.size < 2 || parts[1].isBlank()) throw IllegalStateException("Nesaprotams žetons")
-            val expected = md5("https://$SITE_HOST$passport")
-            if (parts[0] != expected) android.util.Log.i("estudijas", "Žetona paraksts nesakrīt (nav kritiski)")
-            finishWith(parts[1], parts.getOrNull(2) ?: "", null)
+            val t = decodeLaunchToken(url) ?: return true
+            finishWith(t.first, t.second, null)
         } catch (e: Exception) {
             finishWith(null, null, "Neizdevās nolasīt piekļuves žetonu: ${e.message}")
         }
         return true
     }
-
-    private fun md5(s: String) = MessageDigest.getInstance("MD5").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 
     private fun finishWith(token: String?, priv: String?, error: String?) {
         if (done) return
