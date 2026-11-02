@@ -290,6 +290,19 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 /* web lapa (estudijas.lodelo.de): darbvirsmas lietas paslēptas, dažas tikai webā */
 .web .pc-only { display: none !important; }
 html:not(.web) .web-only { display: none !important; }
+dialog#msdlg { padding: 22px 26px 24px; }
+.ms-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 4px 0 18px; font-size: 13px; color: var(--ink-soft); }
+.ms-steps li { flex: 1; display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 3px solid var(--line); }
+.ms-steps li span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); font-size: 11px; }
+.ms-steps li.on { color: var(--ink); font-weight: 600; border-top-color: var(--ink); }
+.ms-steps li.on span { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.ms-steps li.ok { border-top-color: var(--ok); }
+.ms-steps li.ok span { background: var(--ok); color: #fff; border-color: var(--ok); }
+.ms-go { width: 100%; padding: 11px; font-size: 16px; }
+.ms-wait { display: flex; align-items: center; gap: 12px; padding: 22px 0; color: var(--ink-soft); }
+.spin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--ink); animation: spin .8s linear infinite; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ms-text { max-height: 160px; overflow: auto; font-size: 13px; }
 .ms-form { display: grid; gap: 10px; margin: 6px 0 4px; }
 .ms-form input { font: inherit; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-s);
   background: var(--sheet); color: var(--ink); width: 100%; box-sizing: border-box; }
@@ -772,6 +785,7 @@ async function loadStatus() {
   renderAccount();
   if (WEB) {
     renderWebPanels();
+    if (!msAutoShown && !s.auth.mode) { msAutoShown = true; setTimeout(openMsLogin, 300); }
     if (s.flash) { toast(s.flash.msg, s.flash.kind === "err"); }
     if (s.tab) showTab(s.tab);
   } else {
@@ -1412,18 +1426,18 @@ function renderWebPanels() {
 }
 
 /* ---------- web lapa: RTU pieteikšanās ---------- */
-let msTimer = null, msKey = "", msShot = false, msActive = false;
+let msTimer = null, msKey = "", msShot = false, msActive = false, msStage = 0, msAutoShown = false;
 function openMsLogin() {
   const dlg = $("#msdlg");
   if (!dlg.open) dlg.showModal();
-  msShot = false; msKey = "";
+  msShot = false; msKey = ""; msStage = 0;
   renderMs({ step: "start" });
 }
 function msInput(cmd) { return post("/api/ms/input", cmd).catch(e => toast(e.message, true)); }
-function msField(attrs, label, onsubmit) {
+function msField(attrs, label, onsubmit, btn = "Turpināt") {
   const inp = el("input", attrs);
   const form = el("form", { class: "ms-form", onsubmit: e => { e.preventDefault(); if (inp.value.trim()) { onsubmit(inp.value); } } },
-    el("label", { class: "muted", for: attrs.id, text: label }), inp, el("button", { class: "btn", type: "submit" }, "Turpināt"));
+    el("label", { class: "muted", for: attrs.id, text: label }), inp, el("button", { class: "btn primary ms-go", type: "submit" }, btn));
   setTimeout(() => inp.focus(), 50);
   return form;
 }
@@ -1450,6 +1464,16 @@ function renderMs(st) {
   if (key === msKey) return;
   msKey = key;
   const kids = [], step = st.step;
+  if (["email", "password", "number", "approve", "otp", "choose", "done"].includes(step) && msShot) {
+    msShot = false; msInput({ a: "shot", on: false });            // atpazīts solis — ekrāna skats nav vajadzīgs
+  }
+  const stage = { start: 0, email: 0, password: 1, number: 2, approve: 2, otp: 2, choose: 2, done: 3 }[step];
+  if (stage !== undefined || step === "loading" || step === "starting") {
+    const cur = stage ?? msStage;
+    msStage = cur;
+    kids.push(el("ol", { class: "ms-steps" }, ["E-pasts", "Parole", "Apstiprināšana"].map((t, i) =>
+      el("li", { class: i < cur ? "ok" : i === cur ? "on" : "" }, el("span", { text: i < cur ? "✓" : String(i + 1) }), t))));
+  }
   if (step === "start") {
     const email = STATUS.rtu_email || (CONFIG && CONFIG.values.email) || "";
     kids.push(el("p", { class: "note", text: "Piesakies ar RTU kontu tāpat kā estudijās. Paroli lapa ieraksta Microsoft logā un nesaglabā." }),
@@ -1463,7 +1487,7 @@ function renderMs(st) {
     if (st.error) kids.push(el("p", { class: "ms-err", text: st.error }));
     kids.push(el("input", { type: "email", autocomplete: "username", value: st.email || "", hidden: true, readonly: true }),
       msField({ id: "ms-pass", type: "password", autocomplete: "current-password", required: true },
-        `Parole${st.who || st.email ? ` (${st.who || st.email})` : ""}`, v => { $("#ms-pass").value = ""; msInput({ a: "password", v }); }));
+        `Parole kontam ${st.who || st.email || ""}`, v => { $("#ms-pass").value = ""; msInput({ a: "password", v }); }, "Pieteikties"));
   } else if (step === "number") {
     kids.push(el("p", { text: "Atver Microsoft Authenticator telefonā un ievadi šo skaitli:" }),
       el("div", { class: "ms-num", text: st.number }),
@@ -1489,13 +1513,15 @@ function renderMs(st) {
   } else if (step === "error" || step === "cancelled" || step === "none") {
     kids.push(el("p", { class: step === "error" ? "ms-err" : "note", text: st.message || "Pieteikšanās nav aktīva." }),
       el("div", { class: "ms-foot" }, el("button", { class: "btn", type: "button", onclick: () => { msKey = ""; renderMs({ step: "start" }); } }, "Mēģināt vēlreiz")));
+  } else if (step === "unknown") {
+    kids.push(el("p", { text: st.message || "Microsoft prasa kaut ko, ko lapa neatpazīst." }),
+      st.text && !msShot ? el("pre", { class: "fulltext ms-text", text: st.text }) : null,
+      !msShot ? el("button", { class: "btn", type: "button", onclick: () => { msShot = true; msInput({ a: "shot", on: true }); msKey = ""; renderMs(st); } }, "Parādīt Microsoft logu") : null);
   } else {
-    kids.push(el("p", { class: "note", text: st.message || "Ielādē…" }));
-    if (step === "unknown" && st.text && !st.shot) kids.push(el("pre", { class: "fulltext", text: st.text }));
+    kids.push(el("div", { class: "ms-wait" }, el("span", { class: "spin", "aria-hidden": "true" }), el("span", { text: st.message || "Ielādē…" })));
   }
   const live = !["start", "done", "error", "cancelled", "none"].includes(step);
-  if (live && (msShot || step === "unknown")) {
-    if (!msShot) { msShot = true; }
+  if (live && msShot) {
     const img = el("img", { id: "ms-shot", class: "ms-shot", alt: "Microsoft pieteikšanās ekrāns", src: st.shot || "",
       onclick: e => { const r = e.target.getBoundingClientRect();
         msInput({ a: "click", x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }); } });
@@ -1508,7 +1534,6 @@ function renderMs(st) {
   }
   if (live) kids.push(el("div", { class: "ms-foot" },
     ["number", "approve", "otp"].includes(step) ? el("button", { class: "linkish", type: "button", onclick: () => msInput({ a: "other" }) }, "Cits apstiprināšanas veids") : null,
-    !msShot ? el("button", { class: "linkish", type: "button", onclick: () => { msShot = true; msInput({ a: "shot", on: true }); msKey = ""; renderMs(st); } }, "Rādīt Microsoft ekrānu") : null,
     el("span", { style: "flex:1" }),
     el("button", { class: "btn ghost small", type: "button", onclick: () => { msInput({ a: "cancel" }); $("#msdlg").close(); } }, "Atcelt")));
   $("#ms-body").replaceChildren(...kids.flat().filter(Boolean));

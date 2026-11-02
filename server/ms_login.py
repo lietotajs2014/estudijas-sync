@@ -147,6 +147,7 @@ class LoginSession:
 
         end = time.time() + TIMEOUT_S
         last_shot = 0.0
+        unknown_since = 0.0
         while time.time() < end:
             if time.time() - self.touched > 240:         # lapa aizvērta — nav jēgas turēt pārlūku
                 self._set(step="cancelled", message="Pieteikšanās pārtraukta.")
@@ -184,6 +185,14 @@ class LoginSession:
             pend_step, pend_t = self._pending
             if step == pend_step and not st.get("error") and time.time() - pend_t < 5:
                 continue                                   # ievadītais vēl tiek apstrādāts — rāda "Ielādē…"
+            # pāradresācijas / ielādes lapas bez laukiem — tas nav "neparedzēts", tikai jāpagaida
+            if step == "unknown":
+                unknown_since = unknown_since or time.time()
+                if time.time() - unknown_since < 12:
+                    self._keep(step="loading", message="Gaidu Microsoft…")
+                    continue
+            else:
+                unknown_since = 0.0
             if step == "kmsi":
                 self._click(page, SEL["kmsi_yes"])        # "Palikt pierakstītam?" → Jā
                 self._keep(step="loading", message="Pabeidzu pieteikšanos…")
@@ -201,12 +210,12 @@ class LoginSession:
                 "approve": "Apstiprini pieteikšanos Microsoft Authenticator lietotnē.",
                 "otp": "Ievadi kodu no Authenticator lietotnes vai SMS.",
                 "choose": "Izvēlies, kā apstiprināt pieteikšanos.",
-                "unknown": "Microsoft rāda kaut ko neparedzētu. Zemāk ir ekrāns: uzspied uz vajadzīgā vai raksti.",
+                "unknown": "Microsoft prasa kaut ko, ko lapa neatpazīst.",
             }.get(step, "")
             self._set(step=step, message=msg, error=st.get("error"), number=st.get("number"),
                       options=st.get("options"), text=st.get("text") if step in ("otp", "approve", "unknown") else None,
                       who=st.get("who"))
-            if self.want_shot or step == "unknown":
+            if self.want_shot:
                 if time.time() - last_shot > 1.0:
                     try:
                         self.shot = page.screenshot(type="jpeg", quality=60)
