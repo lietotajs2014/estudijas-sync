@@ -205,12 +205,14 @@ button.title:hover { text-decoration: underline; }
 .where b { font: 600 16px/1.35 var(--font-head); overflow-wrap: anywhere; }
 .where .row { margin: 0; }
 #out-warn { display: block; color: var(--bad); font-size: 13px; }
-.ffilters { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)) minmax(200px, 2fr); gap: 10px 12px; margin-bottom: 10px; }
+.ffilters { display: grid; grid-template-columns: repeat(3, minmax(150px, 1fr)) minmax(200px, 2fr); gap: 10px 12px; margin-bottom: 10px; }
 .ffilters .field select, .ffilters .field input { width: 100%; border: 1px solid var(--line); background: var(--sheet); border-radius: var(--radius-s); padding: 6px 8px; }
 .bulk { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 2px solid var(--ink); position: sticky; top: 0; background: var(--paper); z-index: 2; }
 .ftable td.c { width: 30px; }
 .ftable td.name b { font-weight: 600; display: block; overflow-wrap: anywhere; }
-.ftable td.name small { color: var(--ink-soft); }
+.ftable td.name small { color: var(--ink-soft); display: block; }
+.ftable .fdl { font-size: 13px; text-decoration: none; margin-top: 2px; }
+.ftable .fdl.ok { color: var(--ok); } .ftable .fdl.bad { color: var(--bad); }
 .ftable tr.sel { background: color-mix(in srgb, var(--md) 9%, transparent); }
 .ftable td.act { white-space: nowrap; text-align: right; }
 .ftable td.act .btn + .btn { margin-left: 6px; }
@@ -349,13 +351,8 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         <div class="field"><label for="ff-dl">Termiņš</label><select id="ff-dl"></select></div>
         <div class="field"><label for="ff-status">Statuss</label>
           <select id="ff-status">
-            <option value="">Visi</option><option value="here">Ir mapē</option><option value="missing">Nav mapē</option>
-            <option value="notdl">Nav lejupielādēti</option><option value="other">Citām grupām</option>
-          </select></div>
-        <div class="field"><label for="ff-sort">Kārtot</label>
-          <select id="ff-sort">
-            <option value="new">Jaunākie augšā</option><option value="course">Pa kursiem</option>
-            <option value="name">Pēc nosaukuma</option><option value="size">Lielākie augšā</option>
+            <option value="open">Neizpildītie</option><option value="donetask">Izpildītie</option><option value="">Visi</option>
+            <option value="notdl">Nav lejupielādēti</option><option value="missing">Nav mapē</option><option value="other">Citām grupām</option>
           </select></div>
         <div class="field grow"><label for="ff-q">Meklēt</label><input id="ff-q" type="search" placeholder="Faila, tēmas vai sadaļas nosaukums"></div>
       </div>
@@ -854,7 +851,26 @@ async function renderChanges() {
 /* ---------- faili ---------- */
 let FD = { files: [], output_dir: "" };
 const sel = new Set();
-const fui = { course: "", dl: "", status: "", sort: "new", q: "", cats: new Set() };
+const fui = { course: "", dl: "", status: "open", q: "", cats: new Set() };
+/* katram failam — tā termiņš (uzdevuma pielikums vai tās pašas sadaļas fails); priekšroka tuvākajam gaidāmajam */
+function fileDeadlines() {
+  const map = new Map(), now = new Date();
+  const score = d => { const t = new Date(d.due); return t >= now ? t - now : 1e13 + (now - t); };
+  for (const d of [...(VIEW.deadlines || [])].sort((a, b) => score(a) - score(b))) {
+    const m = /^cm-(\d+)$/.exec(d.uid || "");
+    for (const f of relatedFiles(d)) {
+      const direct = m && f.cmid === m[1];
+      const cur = map.get(f.key);
+      if (!cur || (direct && !cur.direct)) map.set(f.key, { d, direct });
+    }
+  }
+  return map;
+}
+function deadlineOrder(a, b) {
+  const now = new Date(), ta = new Date(a.due), tb = new Date(b.due);
+  if ((ta >= now) !== (tb >= now)) return ta >= now ? -1 : 1;   // gaidāmie vispirms
+  return ta >= now ? ta - tb : tb - ta;                          // tuvākie augšā, pagājušie — jaunākie augšā
+}
 const ST_LABEL = { here: "ir mapē", missing: "nav mapē", notdl: "nav lejupielādēts", other: "citai grupai", error: "kļūda" };
 function fileState(f) {
   if (f.status === "downloaded") return f.exists ? "here" : "missing";
@@ -893,9 +909,14 @@ function buildFileFilters() {
   cs.replaceChildren(el("option", { value: "", text: "Visi kursi" }), ...courses.map(([id, n]) => el("option", { value: id, text: n })));
   cs.value = cur;
   const ds = $("#ff-dl"); const curd = fui.dl;
-  const dls = (VIEW.deadlines || []).filter(d => relatedFiles(d).length);
+  const dls = (VIEW.deadlines || []).filter(d => relatedFiles(d).length && (!fui.course || String(d.course_id) === fui.course))
+    .sort(deadlineOrder);
+  const now = new Date();
+  const opt = d => el("option", { value: d.uid, text: `${fmtDate(d.due, false)} ${d.kind} ${d.course}: ${d.title}${d.done ? " ✓" : ""}`.slice(0, 90) });
+  const upcoming = dls.filter(d => new Date(d.due) >= now), past = dls.filter(d => new Date(d.due) < now);
   ds.replaceChildren(el("option", { value: "", text: "Visi" }),
-    ...dls.map(d => el("option", { value: d.uid, text: `${fmtDate(d.due, false)} ${d.kind} ${d.course}: ${d.title}`.slice(0, 80) })));
+    upcoming.length ? el("optgroup", { label: "Gaidāmie" }, upcoming.map(opt)) : null,
+    past.length ? el("optgroup", { label: "Pagājušie" }, past.map(opt)) : null);
   ds.value = curd;
   const cats = [...new Set(FD.files.map(f => f.category))].filter(Boolean).sort();
   $("#file-cats").replaceChildren(
@@ -908,19 +929,35 @@ function visibleFiles() {
   const q = fui.q.toLowerCase();
   const dl = fui.dl ? [...(VIEW.deadlines || [])].find(d => d.uid === fui.dl) : null;
   const relKeys = dl ? new Set(relatedFiles(dl).map(f => f.key)) : null;
-  let rows = FD.files.filter(f =>
+  const fdl = fileDeadlines();
+  const statusOk = f => {
+    const st = fileState(f), d = (fdl.get(f.key) || {}).d;
+    switch (fui.status) {
+      case "open": return st !== "other" && !(d && d.done);        // izpildīto uzdevumu faili paslēpti
+      case "donetask": return !!(d && d.done);
+      case "notdl": return ["notdl", "error"].includes(st);
+      case "missing": return st === "missing";
+      case "other": return st === "other";
+      default: return st !== "other";
+    }
+  };
+  const rows = FD.files.filter(f =>
     (!fui.course || String(f.course_id) === fui.course) && (!fui.cats.size || fui.cats.has(f.category))
-    && (!relKeys || relKeys.has(f.key))
-    && (!fui.status || (fui.status === "notdl" ? ["notdl", "error"].includes(fileState(f)) : fileState(f) === fui.status))
-    && (fui.status === "other" || fui.status ? true : fileState(f) !== "other")
+    && (!relKeys || relKeys.has(f.key)) && statusOk(f)
     && (!q || `${f.filename} ${f.module} ${f.section}`.toLowerCase().includes(q)));
-  const by = { new: (a, b) => fileTime(b).localeCompare(fileTime(a)), name: (a, b) => a.filename.localeCompare(b.filename),
-    size: (a, b) => (b.size || 0) - (a.size || 0),
-    course: (a, b) => (a.course_full || "").localeCompare(b.course_full || "") || a.category.localeCompare(b.category) || a.filename.localeCompare(b.filename) };
-  return rows.sort(by[fui.sort]);
+  // pa kursiem; kursā — vispirms tuvāko gaidāmo termiņu faili, tad pārējie (jaunākie augšā)
+  return rows.sort((a, b) => {
+    const c = (a.course_full || "").localeCompare(b.course_full || "");
+    if (c) return c;
+    const da = (fdl.get(a.key) || {}).d, db = (fdl.get(b.key) || {}).d;
+    if (da && db && da.uid !== db.uid) return deadlineOrder(da, db);
+    if (!!da !== !!db) return da && new Date(da.due) >= new Date() ? -1 : db && new Date(db.due) >= new Date() ? 1 : (da ? -1 : 1);
+    return fileTime(b).localeCompare(fileTime(a));
+  });
 }
-function fileRow(f) {
+function fileRow(f, fdl) {
   const st = fileState(f);
+  const link = fdl && fdl.get(f.key);
   const cb = el("input", { type: "checkbox", "aria-label": `Atzīmēt ${f.filename}`, checked: sel.has(f.key),
     onchange: e => { e.target.checked ? sel.add(f.key) : sel.delete(f.key); tr.classList.toggle("sel", e.target.checked); updateBulk(); } });
   const act = st === "here"
@@ -929,7 +966,9 @@ function fileRow(f) {
     : [el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, "Lejupielādēt")];
   const tr = el("tr", { class: sel.has(f.key) ? "sel" : "" },
     el("td", { class: "c" }, cb),
-    el("td", { class: "name" }, el("b", { text: f.filename }), el("small", { text: [f.module !== f.filename ? f.module : "", f.section].filter(Boolean).join(", ") })),
+    el("td", { class: "name" }, el("b", { text: f.filename }), el("small", { text: [f.module !== f.filename ? f.module : "", f.section].filter(Boolean).join(", ") }),
+      link ? el("button", { class: "linkish fdl" + (link.d.done ? " ok" : new Date(link.d.due) < new Date() && link.d.status ? " bad" : ""), type: "button",
+        onclick: () => openDeadline(link.d), text: `${link.d.kind}: ${link.d.title}, ${fmtDate(link.d.due, false)}${link.d.done ? " ✓" : ""}` }) : null),
     el("td", { class: "hide-m", text: f.course }),
     el("td", { class: "hide-m", text: f.category }),
     el("td", { class: "hide-m", text: fileTime(f) ? fmtDate(fileTime(f), false) : "" }),
@@ -944,13 +983,14 @@ function renderFiles() {
   const rows = visibleFiles();
   if (!rows.length) { box.append(el("div", { class: "empty", text: "Nekas neatbilst filtriem." })); updateBulk(); return; }
   const body = el("tbody");
+  const fdl = fileDeadlines();
   let lastCourse = null;
   for (const f of rows.slice(0, 600)) {
-    if (fui.sort === "course" && f.course_full !== lastCourse) {
+    if (f.course_full !== lastCourse) {
       lastCourse = f.course_full;
       body.append(el("tr", { class: "course-head" }, el("td", { colspan: 8, text: f.course_full || f.course })));
     }
-    body.append(fileRow(f));
+    body.append(fileRow(f, fdl));
   }
   box.append(el("table", { class: "ftable" }, el("thead", {}, el("tr", {}, el("th", {}), el("th", { text: "Fails" }),
     el("th", { class: "hide-m", text: "Kurss" }), el("th", { class: "hide-m", text: "Tips" }), el("th", { class: "hide-m", text: "Datums" }),
@@ -1003,7 +1043,7 @@ function openDeadline(d) {
   body.push(el("div", { class: "dlg-actions" },
     d.url ? el("a", { class: "btn", href: d.url, target: "_blank", rel: "noopener" }, guess ? "Atvērt avotu estudijās" : "Atvērt estudijās") : null,
     course ? el("a", { class: "btn ghost", href: course.url, target: "_blank", rel: "noopener" }, "Atvērt kursu") : null,
-    files.length ? el("button", { class: "btn ghost", type: "button", onclick: () => { dlg.close(); fui.dl = d.uid; fui.course = ""; fui.cats.clear(); showTab("faili"); } }, "Rādīt failos") : null));
+    files.length ? el("button", { class: "btn ghost", type: "button", onclick: () => { dlg.close(); fui.dl = d.uid; fui.course = ""; fui.status = ""; $("#ff-status").value = ""; fui.cats.clear(); showTab("faili"); } }, "Rādīt failos") : null));
   $("#dlg-body").replaceChildren(...body.flat());
   dlg.showModal();
 }
@@ -1137,7 +1177,7 @@ $("#gcal-reconnect").addEventListener("click", () => runJob("gcal"));
 $("#show-past").addEventListener("click", () => { ui.showPast = !ui.showPast; renderDeadlines(); });
 $("#dlg-close").addEventListener("click", () => $("#dlg").close());
 $("#dlg").addEventListener("click", e => { if (e.target.id === "dlg") $("#dlg").close(); });
-["course", "dl", "status", "sort"].forEach(k => $(`#ff-${k}`).addEventListener("change", e => { fui[k] = e.target.value; if (k === "course") buildFileFilters(); renderFiles(); }));
+["course", "dl", "status"].forEach(k => $(`#ff-${k}`).addEventListener("change", e => { fui[k] = e.target.value; if (k === "course") buildFileFilters(); renderFiles(); }));
 $("#ff-q").addEventListener("input", e => { fui.q = e.target.value; renderFiles(); });
 $("#sel-all").addEventListener("change", e => { visibleFiles().forEach(f => e.target.checked ? sel.add(f.key) : sel.delete(f.key)); renderFiles(); });
 $("#sel-clear").addEventListener("click", () => { sel.clear(); renderFiles(); });
