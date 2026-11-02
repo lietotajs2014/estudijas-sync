@@ -14,6 +14,8 @@ const EVENTS = [
   ev(8, 11, "MD2 RMCE0 3. grupa ir jāiesniedz", now + 9 * day, { modulename: "assign", eventtype: "due", url: `${S}/mod/assign/view.php?id=204` }),
 ];
 
+const fmt = t => { const d = new Date(t * 1000); return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.`; };
+const PD_DATE = fmt(now - 3 * day), PD_DATE2 = fmt(now + 6 * day);
 const head = `<html><head><script>M.cfg = {"wwwroot":"${S}","sesskey":"SK123","sessiontimeout":"28800"};</script></head><body>`;
 const act = (id, mod, name, extra = "") => `<li class="activity activity-wrapper ${mod} modtype_${mod}" id="module-${id}" data-id="${id}">
   <div class="activity-item"><img src="${S}/theme/image.php/rtu/${mod === "resource" ? "core/1/f/pdf-24" : `mod_${mod}/1/monologo`}" class="activityicon">
@@ -34,7 +36,14 @@ const PAGES = {
         ${act(201, "assign", "MD1 — masīvi")}${act(202, "assign", "MD0 vecais")}${act(203, "assign", "MD3 RMCE0 1. grupai")}${act(204, "assign", "MD2 RMCE0 3. grupa")}
         ${act(301, "quiz", "Tests 1")}${act(401, "forum", "Paziņojumi")}
     </ul></li></ul></body></html>`,
-  "/course/view.php?id=12": `${head}<ul class="topics"><li class="section course-section main" id="section-0" data-number="0"><h3 class="sectionname">Vispārīgi</h3><ul class="section"></ul></li></ul></body></html>`,
+  "/course/view.php?id=12": `${head}<ul class="topics"><li class="section course-section main" id="section-0" data-number="0"><h3 class="sectionname">Vispārīgi</h3>
+    <div class="summarytext"><p>Lekcijas otrdienās plkst. 9.10, 215. aud.</p></div><ul class="section">
+    <li class="activity label modtype_label" id="module-501" data-id="501"><div class="activity-altcontent">
+      <p>${PD_DATE} PD par robežām un atvasinājumiem.</p><p>PD laikā drīkst izmantot formulu lapu un kalkulatoru.</p>
+      <p>${PD_DATE2} PD 4. grupai</p></div></li>
+    ${act(502, "resource", "Formulu lapa (atvasinājumi, integrāļi)")}
+    ${act(503, "resource", "Lekcija 5 — integrāļi")}
+    </ul></li></ul></body></html>`,
   "/mod/assign/view.php?id=201": `${head}<div class="activity-description" id="intro"><p>Uzdevums par masīviem</p>
     <a href="${S}/pluginfile.php/55/mod_assign/introattachment/0/md1.docx?forcedownload=1">md1.docx</a></div>
     <table class="generaltable submissionstatustable"><tr><td class="submissionstatussubmitted">Iesniegts vērtēšanai</td></tr></table></body></html>`,
@@ -77,4 +86,4 @@ function makeHttp({ loggedIn = () => true, log = [] } = {}) {
     return page ? { status: 200, text: page } : { status: 404, text: "nav" };
   };
 }
-module.exports = { S, now, day, makeHttp, PAGES, EVENTS };
+module.exports = { S, now, day, makeHttp, PAGES, EVENTS, PD_DATE };

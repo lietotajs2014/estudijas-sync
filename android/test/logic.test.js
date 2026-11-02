@@ -55,6 +55,26 @@ const { S, makeHttp } = require("./fake.js");
   assert.strictEqual(c.events.length, 1);
   assert.ok(!v.deadlines.some(d => d.kind === "Konsultācija"));
 
+  // PD no kursa apraksta + ko drīkst izmantot + formulu lapa
+  const pd = v.deadlines.find(d => d.source === "teksts" && d.course_id === 12 && d.kind === "PD");
+  assert.ok(pd, "PD no apraksta: " + JSON.stringify(v.deadlines.map(d => d.title)));
+  assert.ok(pd.due < Date.now() && pd.allday, "pagājušais PD bez laika");
+  assert.ok(/robežām/.test(pd.details));
+  assert.ok(pd.allowed && pd.allowed.some(t => /formulu lapu/.test(t)), JSON.stringify(pd.allowed));
+  assert.ok(pd.sheet_keys && pd.sheet_keys.length === 1 && /502/.test(pd.sheet_keys[0]), JSON.stringify(pd.sheet_keys));
+  assert.ok(!v.deadlines.some(d => d.source === "teksts" && d.due > Date.now() && d.course_id === 12), "4. grupas PD paslēpts");
+  assert.ok(v.hidden.some(d => d.source === "teksts" && d.course_id === 12), "4. grupas PD ir paslēptajos");
+  assert.ok(!v.deadlines.some(d => d.source === "teksts" && /Notikums|Lekcij/.test(d.title)), "plkst. 9.10 nav datums");
+  // datumu atpazīšana
+  const ref = new Date(2026, 10, 2);
+  const dd = s => L.extractDates(s, ref).map(x => `${x.dt.getDate()}.${x.dt.getMonth() + 1}.${x.dt.getFullYear()}${x.has ? " " + x.dt.getHours() + ":" + x.dt.getMinutes() : ""}`);
+  assert.deepStrictEqual(dd("PD notiks 30.10. auditorijā"), ["30.10.2026"]);
+  assert.deepStrictEqual(dd("Matemātikā 30.10 bija PD"), ["30.10.2026"]);
+  assert.deepStrictEqual(dd("KD2 notiks 20. novembrī plkst. 10:15"), ["20.11.2026 10:15"]);
+  assert.deepStrictEqual(dd("Lekcija plkst. 9.10"), []);
+  assert.deepStrictEqual(dd("2026-12-05 tests"), ["5.12.2026"]);
+  assert.deepStrictEqual(dd("Versija 3.5 un 31.02. nav datums"), []);
+
   // otrā reize: iesniegto MD1 lapu neielādē vēlreiz, pielikums saglabājas
   const log2 = [];
   const v2 = await L.sync({ site: S, http: makeHttp({ log: log2 }), program: "RMCE0", group: "3", DOMParser, prev: v });

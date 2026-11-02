@@ -216,7 +216,8 @@ function deadlineRow(d, now) {
   return el("button", { type: "button", class: "dl" + (d.done ? " done" : ""), style: `--c:${kindColor(d.kind)}`, onclick: () => openDeadline(d) },
     el("span", { class: "main" },
       el("span", { class: "t" }, el("span", { class: "kind", style: `--c:${kindColor(d.kind)}`, text: d.kind }), d.title),
-      el("span", { class: "meta", text: d.course + (d.relevance === Logic.OTHER ? " · citai grupai" : "") }),
+      el("span", { class: "meta", text: d.course + (d.source === "teksts" ? " · no kursa apraksta" : "") + (d.relevance === Logic.OTHER ? " · citai grupai" : "") }),
+      d.allowed || d.sheet_keys ? el("span", { class: "meta allowed-hint", text: d.sheet_keys ? `📄 formulu lapas: ${d.sheet_keys.length}` : "ℹ️ ko drīkst izmantot" }) : null,
       statusBadge(d, now)),
     el("span", { class: "when" }, fmtDate(d.due), el("small", { text: fmtTime(d.due) }), el("small", { text: relDays(d.due, now) })));
 }
@@ -251,7 +252,8 @@ function openDeadline(d) {
   const files = (S.view.files || []).filter(f => f.deadline_uid === d.uid);
   const body = [];
   const kv = el("dl", { class: "kv" }, el("dt", { text: "Kurss" }), el("dd", { text: d.course_full || d.course }),
-    el("dt", { text: "Termiņš" }), el("dd", { text: `${fmtFull(d.due)} (${relDays(d.due, now)})` }));
+    el("dt", { text: d.source === "teksts" ? "Datums" : "Termiņš" }), el("dd", { text: `${d.allday ? fmtFull(d.due).replace(/ \d\d:\d\d$/, "") : fmtFull(d.due)} (${relDays(d.due, now)})` }));
+  if (d.source === "teksts") kv.append(el("dt", { text: "Avots" }), el("dd", { text: "atrasts kursa aprakstā (nav estudiju kalendārā)" }));
   if (d.start) kv.append(el("dt", { text: "Sākums" }), el("dd", { text: fmtFull(d.start) }));
   if (d.status) kv.append(el("dt", { text: "Statuss" }), el("dd", {}, statusBadge(d, now) || d.status));
   if (d.section) kv.append(el("dt", { text: "Sadaļa" }), el("dd", { text: d.section }));
@@ -261,6 +263,9 @@ function openDeadline(d) {
     el("a", { href: "#", onclick: e => { e.preventDefault(); closeSheet(); showConsult(d.course_id); }, text: "Kursa konsultācijas →" })));
   if (d.details) body.push(el("div", { class: "details", text: d.details }));
   if (files.length) body.push(el("h3", { text: "Faili" }), files.map(fileRow));
+  if (d.allowed && d.allowed.length) body.push(el("h3", { text: "Ko drīkst izmantot" }), el("ul", { class: "allowed" }, d.allowed.map(t => el("li", { text: t }))));
+  const sheets = (d.sheet_keys || []).map(k => S.view.files.find(f => f.key === k)).filter(Boolean);
+  if (sheets.length) body.push(el("h3", { text: "Formulu lapas" }), sheets.map(fileRow));
   body.push(el("div", { class: "btns" },
     d.url ? el("button", { class: "btn", type: "button", onclick: () => openPage(d.url), text: "Atvērt estudijās" }) : null,
     N && N.addEvent && d.due > now ? el("button", { class: "btn ghost", type: "button", text: "Pievienot kalendāram",

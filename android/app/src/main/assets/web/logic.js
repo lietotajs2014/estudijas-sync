@@ -257,6 +257,145 @@
     return [...out.values()];
   }
 
+  /* ---------- termiņi brīvā tekstā (piem. "30.10. PD par integrāļiem") ---------- */
+  const MONTH_WORD = "(?:janv\\p{L}*|jan(?:uary)?|febr\\p{L}*|feb|mart\\p{L}*|march|mar|apr\\p{L}*|maij\\p{L}*|may|jūn\\p{L}*|june?|jūl\\p{L}*|july?|aug\\p{L}*|sept?\\p{L}*|okt\\p{L}*|oct\\p{L}*|nov\\p{L}*|dec\\p{L}*)";
+  const MONTH_PREFIXES = [["janv", 1], ["jan", 1], ["febr", 2], ["feb", 2], ["mar", 3], ["apr", 4], ["maij", 5], ["may", 5], ["jūn", 6], ["jun", 6],
+    ["jūl", 7], ["jul", 7], ["aug", 8], ["sep", 9], ["okt", 10], ["oct", 10], ["nov", 11], ["dec", 12]];
+  const RE_ISO = /(?<!\d)(20\d\d)-(\d{1,2})-(\d{1,2})(?!\d)/g;
+  const RE_LVGADA = new RegExp(`(?<!\\d)(20\\d\\d)\\.\\s*g(?:ada|\\.)?\\s+(\\d{1,2})\\.\\s*(${MONTH_WORD})`, "giu");
+  const RE_DAYMON = new RegExp(`(?<![\\d.])(\\d{1,2})\\.?\\s+(${MONTH_WORD})(?!\\p{L})(?:\\s+(20\\d\\d))?`, "giu");
+  const RE_NUM = /(?<![\d.:])(\d{1,2})\.(\d{1,2})(\.(?:(20\d\d|\d\d)(?!\d))?)?(?![\d:])/g;
+  const RE_TIME = /^[\s,.]*(?:g\.\s*)?(?:plkst\.?|pulksten\p{L}*|at|līdz|until|no)?\s*([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)(?:\s*([ap])\.?\s?m\b\.?)?/iu;
+  const TEXT_KINDS = [
+    ["KD", /(?<!\p{L})KD(?:\s*\d+)?(?!\p{L})|kontroldarb|kolokvij/giu],
+    ["Eksāmens", /eksām|ieskait|\bexam/giu],
+    ["Tests", /\btest\p{L}*|\bquiz/giu],
+    ["MD", /(?<!\p{L})MD(?:\s*\d+)?(?!\p{L})|mājas\s*darb|majas\s*darb|mājasdarb|homework/giu],
+    ["LD", /(?<!\p{L})LD(?:\s*\d+)?(?!\p{L})|laborator/giu],
+    ["PD", /(?<!\p{L})PD(?:\s*\d+)?(?!\p{L})|praktisk\p{L}*\s+(?:darb|uzdev)/giu],
+    ["Termiņš", /termiņ|iesnie[gd]|nodo[tš]|deadline|\bdue\b|aizstāvē/giu],
+  ];
+  const monthNum = w => { w = w.toLowerCase(); const p = MONTH_PREFIXES.find(([k]) => w.startsWith(k)); return p ? p[1] : null; };
+  function mkDate(y, mo, d) { const t = new Date(y, mo - 1, d); return t.getMonth() === mo - 1 && t.getDate() === d ? t : null; }
+  function resolveYear(mo, d, now) {
+    let best = null, bd = null;
+    for (const y of [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]) {
+      const t = mkDate(y, mo, d); if (!t) continue;
+      const delta = (t - now) / 864e5;
+      if (delta >= -150 && delta <= 250 && (bd == null || Math.abs(delta) < Math.abs(bd))) { best = t; bd = delta; }
+    }
+    return best;
+  }
+  function extractDates(line, now) {
+    const found = [], taken = [];
+    const overlaps = (a, b) => taken.some(([x, y]) => a < y && x < b);
+    const add = (dt, s, e) => {
+      if (!dt || overlaps(s, e)) return;
+      const m = RE_TIME.exec(line.slice(e, e + 30));
+      let has = false;
+      if (m) {
+        let h = +m[1]; const ap = (m[3] || "").toLowerCase();
+        if (ap === "p" && h < 12) h += 12; else if (ap === "a" && h === 12) h = 0;
+        dt = new Date(dt); dt.setHours(h, +m[2], 0, 0); has = true;
+      }
+      taken.push([s, e]); found.push({ dt, has, s, e });
+    };
+    for (const m of line.matchAll(RE_ISO)) add(mkDate(+m[1], +m[2], +m[3]), m.index, m.index + m[0].length);
+    for (const m of line.matchAll(RE_LVGADA)) { const mo = monthNum(m[3]); if (mo) add(mkDate(+m[1], mo, +m[2]), m.index, m.index + m[0].length); }
+    for (const m of line.matchAll(RE_DAYMON)) {
+      const mo = monthNum(m[2]); if (!mo) continue;
+      add(m[3] ? mkDate(+m[3], mo, +m[1]) : resolveYear(mo, +m[1], now), m.index, m.index + m[0].length);
+    }
+    for (const m of line.matchAll(RE_NUM)) {
+      const d = +m[1], mo = +m[2], yr = m[4];
+      if (!(d >= 1 && d <= 31 && mo >= 1 && mo <= 12)) continue;
+      const before = line.slice(0, m.index);
+      if (!yr && !before.trim() && !(m[1].length === 2 && m[2].length === 2)) continue;   // "2.1." rindas sākumā — numerācija, "30.10." — datums
+      if (!m[3] && m[2].length < 2) continue;                    // "3.5" — skaitlis, nevis datums
+      if (!m[3] && /(plkst\.?|pulksten\p{L}*|no|līdz)\s*$/iu.test(before)) continue;   // "plkst. 9.10" — laiks
+      add(yr ? mkDate(+yr + (yr.length === 2 ? 2000 : 0), mo, d) : resolveYear(mo, d, now), m.index, m.index + m[0].length);
+    }
+    return found.sort((a, b) => a.s - b.s);
+  }
+  function nearestKind(line, pos) {
+    let best = null, bs = null;
+    for (const [kind, rx] of TEXT_KINDS) for (const m of line.matchAll(rx)) {
+      let score = m.index <= pos ? pos - m.index : (m.index - pos) * 1.5;
+      if (kind === "Termiņš") score += 40;
+      if (bs == null || score < bs) { best = kind; bs = score; }
+    }
+    return best;
+  }
+  const djb = s => { let h = 5381; for (const ch of s) h = ((h * 33) ^ ch.codePointAt(0)) >>> 0; return h.toString(36); };
+  function textTitle(line, x, kind, src) {
+    let rest = (line.slice(0, x.s) + " " + line.slice(x.e)).replace(/\s+/g, " ").replace(/^[\s.,:;–—-]+|[\s.,:;–—-]+$/g, "");
+    rest = rest.replace(/^(plkst\.?\s*)?\d{1,2}[:.]\d{2}\s*/i, "");
+    if (rest.length < 3) return `${kind} (${src})`;
+    if (!new RegExp(TEXT_KINDS.find(([k]) => k === kind)[1].source, "iu").test(rest)) rest = `${kind}: ${rest}`;
+    return rest.length > 80 ? rest.slice(0, 77) + "…" : rest;
+  }
+  /** Termiņi kursu tekstos (apraksti, paziņojumi, lapas), kuru nav estudiju kalendārā. */
+  function findTextDeadlines(texts, matchers, existing, now) {
+    const out = new Map(), nowD = new Date(now);
+    const lo = now - 180 * 864e5, hi = now + 250 * 864e5;
+    const dayKey = (cid, t) => `${cid}|${new Date(t).toDateString()}`;
+    const known = new Set(existing.map(d => dayKey(d.course_id, d.due)));
+    for (const tb of texts) {
+      const m = matchers.get(tb.course_id);
+      for (let line of (tb.text || "").split("\n")) {
+        line = line.trim();
+        if (line.length < 6) continue;
+        let prevEnd = 0;
+        for (const x of extractDates(line, nowD)) {
+          const window = line.slice(prevEnd, x.e + 3); prevEnd = x.e;
+          const kind = nearestKind(line, x.s);
+          if (!kind) continue;
+          const dt = new Date(x.dt); if (!x.has) dt.setHours(23, 59, 0, 0);
+          const t = dt.getTime();
+          if (t < lo || t > hi || known.has(dayKey(tb.course_id, t))) continue;
+          const rel = m ? m.first(window, line, tb.title) : null;
+          const key = `${dayKey(tb.course_id, t)}|${kind}`;
+          if (out.has(key) && !(out.get(key).relevance === OTHER && rel !== OTHER)) continue;
+          out.set(key, { uid: "txt-" + djb(key), course_id: tb.course_id, kind, title: textTitle(line, x, kind, tb.title), due: t, start: null,
+            url: tb.url, status: null, section: "", source: "teksts", details: line.length <= 300 ? line : line.slice(0, 297) + "…", relevance: rel,
+            allday: !x.has });
+        }
+      }
+    }
+    return [...out.values()];
+  }
+
+  /* ---------- ko drīkst izmantot (formulu lapas, konspekti, kalkulators) ---------- */
+  const ALLOWED_RE = /(drīkst|var|atļaut\p{L}*|nedrīkst|aizliegt\p{L}*)\s+(?:\p{L}+\s+){0,3}?(izmantot|lietot|ņemt)|palīglīdzekļ|formul\p{L}*\s+lap|formulu\s+(?:krājum|izdruk)|izziņas\s+materiāl|kalkulator|konspekt\p{L}*\s+(?:drīkst|var|nedrīkst)|open[- ]book|cheat ?sheet/iu;
+  const FORMULA_FILE_RE = /formul|izziņ|cheat|tabul\p{L}*\s+(?:ar|integr|atvasin)|integrāļu\s+tabul|atvasinājumu\s+tabul/iu;
+  const ASSESSED = new Set(["KD", "PD", "Tests", "Eksāmens"]);
+  /** Katram KD/PD/testam pievieno "ko drīkst izmantot" rindas un kursa formulu lapas. */
+  function attachAllowed(deadlines, texts, files) {
+    const lines = new Map(), sheets = new Map();
+    for (const tb of texts) for (let ln of (tb.text || "").split("\n")) {
+      ln = ln.trim();
+      if (ln.length < 8 || !ALLOWED_RE.test(ln)) continue;
+      if (!lines.has(tb.course_id)) lines.set(tb.course_id, []);
+      const arr = lines.get(tb.course_id);
+      const kinds = TEXT_KINDS.filter(([k]) => k !== "Termiņš").filter(([, rx]) => new RegExp(rx.source, "iu").test(ln)).map(([k]) => k);
+      if (!arr.some(x => x.text === ln)) arr.push({ text: ln.length <= 300 ? ln : ln.slice(0, 297) + "…", kinds, source: tb.title });
+    }
+    for (const f of files) if (FORMULA_FILE_RE.test(`${f.filename} ${f.module}`)) {
+      if (!sheets.has(f.course_id)) sheets.set(f.course_id, []);
+      sheets.get(f.course_id).push(f);
+    }
+    for (const d of deadlines) {
+      if (!ASSESSED.has(d.kind)) continue;
+      const own = (lines.get(d.course_id) || []).filter(x => !x.kinds.length || x.kinds.includes(d.kind) || (d.kind === "Eksāmens" && x.kinds.includes("KD")));
+      if (own.length) d.allowed = own.slice(0, 5).map(x => x.text);
+      const sh = (sheets.get(d.course_id) || []).filter(f => {
+        const k = classifyKind(`${f.filename} ${f.module} ${f.subpath || ""}`, "");
+        return !k || k === d.kind;
+      });
+      if (sh.length) d.sheet_keys = sh.slice(0, 8).map(f => f.key);
+    }
+  }
+
   /* ---------- sinhronizācija ---------- */
   const isDone = s => /^(iesniegts|izpildīts|novērtēts)/i.test(s || "");
   const CMID = u => { const m = /\/mod\/(\w+)\/view\.php\?(?:[^#]*&)?id=(\d+)/.exec(u || ""); return m ? { mod: m[1], cmid: m[2] } : null; };
@@ -367,7 +506,7 @@
             else if (a.modtype === "folder") extraPages.push({ type: "folder", c, a, sec, base });
             else if (a.modtype === "assign") assigns.push({ c, a, sec, base });
             else if (a.modtype === "quiz") quizzes.push({ c, a, sec });
-            else if (a.modtype === "page" && /konsult|kontakt|inform|grafik|par kursu|pasniedz|vērtēšan/i.test(a.name)) extraPages.push({ type: "page", c, a });
+            else if (a.modtype === "page" && /konsult|kontakt|inform|grafik|par kursu|pasniedz|vērtēšan|plān|termiņ|kalendār|nodarb|praktisk|kontroldarb|(?<!\p{L})(PD|KD)(?!\p{L})/iu.test(a.name)) extraPages.push({ type: "page", c, a });
             else if (a.modtype === "forum" && (firstForum || /paziņoj|announce|jaunum|news/i.test(a.name))) extraPages.push({ type: "forum", c, a });
             if (a.modtype === "forum") firstForum = false;
           }
@@ -467,8 +606,9 @@
 
     // 4) atlase pēc programmas/grupas
     const matchers = new Map(courses.map(c => [c.id, Matcher.build(program, group, [])]));
+    for (const d of findTextDeadlines(texts, matchers, [...deadlines.values()], now)) deadlines.set(d.uid, d);
     const all = [...deadlines.values()];
-    for (const d of all) { const m = matchers.get(d.course_id); d.relevance = m ? m.first(d.title, d.section, (d.details || "").slice(0, 400)) : null; }
+    for (const d of all) if (d.source !== "teksts") { const m = matchers.get(d.course_id); d.relevance = m ? m.first(d.title, d.section, (d.details || "").slice(0, 400)) : null; }
     const keep = otherGroups === "keep";
     const decorate = d => ({ ...d, done: isDone(d.status), course: (byId.get(d.course_id) || {}).label || "", course_full: (byId.get(d.course_id) || {}).full || "" });
     const visible = all.filter(d => keep || d.relevance !== OTHER).map(decorate).sort((a, b) => a.due - b.due);
@@ -486,6 +626,7 @@
         fileurl: f.fileurl || "", link: f.link || "", page_url: f.page_url, deadline_uid: f.deadline_uid || null, other });
     }
     const outFiles = [...fileByKey.values()].filter(f => keep || !f.other);
+    attachAllowed(visible, texts, outFiles);
 
     // 5) konsultācijas
     const items = consultItems(texts), mails = emailsFromTexts(texts);
@@ -527,6 +668,6 @@
   }
 
   const api = { htmlToText, Moodle, MoodleError, classifyKind, classifyFile, groupNumbers, Matcher, MINE, OTHER,
-    consultItems, emailsFromTexts, parseSections, ftypeFromIcon, sync, diff, isDone };
+    consultItems, emailsFromTexts, parseSections, ftypeFromIcon, extractDates, findTextDeadlines, attachAllowed, sync, diff, isDone };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Logic = api;
 })(typeof window !== "undefined" ? window : globalThis);

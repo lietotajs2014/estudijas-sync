@@ -25,7 +25,7 @@ _MONTH_PREFIXES = [("janv", 1), ("jan", 1), ("febr", 2), ("feb", 2), ("mar", 3),
 RE_ISO = re.compile(r"(?<!\d)(20\d\d)-(\d{1,2})-(\d{1,2})(?!\d)")
 RE_LVGADA = re.compile(rf"(?<!\d)(20\d\d)\.\s*g(?:ada|\.)?\s+(\d{{1,2}})\.\s*({MONTH_WORD})", re.I)
 RE_DAYMON = re.compile(rf"(?<![\d.])(\d{{1,2}})\.?\s+({MONTH_WORD})\b(?:\s+(20\d\d))?", re.I)
-RE_NUM = re.compile(r"(?<![\d.])(\d{1,2})\.(\d{1,2})\.(?:(20\d\d|\d\d)(?!\d))?")
+RE_NUM = re.compile(r"(?<![\d.:])(\d{1,2})\.(\d{1,2})(\.(?:(20\d\d|\d\d)(?!\d))?)?(?![\d:])")
 RE_TIME = re.compile(r"^[\s,.]*(?:g\.\s*)?(?:plkst\.?|pulksten\w*|at|līdz|until)?\s*"
                      r"([01]?\d|2[0-3])[:.]([0-5]\d)(?!\d)(?:\s*([ap])\.?\s?m\b\.?)?", re.I)
 
@@ -114,11 +114,16 @@ def extract_dates(line: str, now: datetime) -> list[tuple[datetime, bool, tuple[
         dt = mk(int(m.group(3)), mo, day) if m.group(3) else _resolve_year(mo, day, now)
         add(dt, m.start(), m.end())
     for m in RE_NUM.finditer(line):
-        day, mo, yr = int(m.group(1)), int(m.group(2)), m.group(3)
+        day, mo, yr = int(m.group(1)), int(m.group(2)), m.group(4)
         if not (1 <= day <= 31 and 1 <= mo <= 12):
             continue
-        if not yr and not line[: m.start()].strip():
-            continue  # rindas sākumā "2.1." visticamāk ir virsraksta numerācija
+        before = line[: m.start()]
+        if not yr and not before.strip() and not (len(m.group(1)) == 2 and len(m.group(2)) == 2):
+            continue  # rindas sākumā "2.1." visticamāk ir virsraksta numerācija ("30.10." gan ir datums)
+        if not m.group(3) and len(m.group(2)) < 2:
+            continue  # "3.5" bez beigu punkta — skaitlis, nevis datums
+        if not m.group(3) and re.search(r"(plkst\.?|pulksten\w*|no|līdz)\s*$", before, re.I):
+            continue  # "plkst. 9.10" — laiks
         if yr:
             y = int(yr) + (2000 if len(yr) == 2 else 0)
             dt = mk(y, mo, day)
