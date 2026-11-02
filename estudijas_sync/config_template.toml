@@ -1,0 +1,67 @@
+# estudijas-sync konfigurācija (katram lietotājam/profilam sava).
+# Pēc izmaiņām nekas nav jāpārstartē — nākamā palaišana nolasīs jaunās vērtības.
+
+site = "https://estudijas.rtu.lv"
+
+# Kur glabāt failus. Katram kursam tiek izveidota sava mape.
+output_dir = "~/Documents/RTU estudijas"
+
+timezone = "Europe/Riga"
+
+# Kursa mapes nosaukums: "fullname" (pilns nosaukums) vai "shortname" (kods)
+course_folder_name = "fullname"
+
+# Regulārās izteiksmes kursu atlasei pēc nosaukuma/koda. Tukšs = visi pašreizējie kursi.
+# Piem.: exclude_courses = ["Sports", "Informācija studentiem"]
+include_courses = []
+exclude_courses = []
+
+# KAS TU ESI — vienā kursā bieži ir vairāku programmu/grupu uzdevumi; atlasa tikai tavējos.
+program = ""            # tava studiju programma/plūsma, piem. "RMCE0"
+group = ""              # tava grupa, piem. "3"
+# Citu programmu/grupu materiāli: "skip" (nelejupielādēt, tikai uzskaitīt UZDEVUMI.md),
+# "folder" (likt kursa mapē "_Citām grupām"), "keep" (neatlasīt vispār).
+other_groups = "skip"
+# Kā atpazīt citu programmu kodus. Tukšs = tādas pašas formas kā tavs (RMCE0 → R + 3 burti + cipars).
+other_program_pattern = ""
+# Papildu grupu apzīmējumi (ja vajag). Grupas no estudijām tiek nolasītas arī automātiski.
+my_groups = []
+
+# Kuras failu kategorijas lejupielādēt (nosaukumi no [categories] + "Lekcijas", "Uzdevumi", "Citi").
+# Tukšs = visas. Telefonam, piem.: only_categories = ["Mājas darbi"]
+# Termiņi, kalendārs un UZDEVUMI.md tiek veidoti vienmēr, neatkarīgi no šī.
+only_categories = []
+
+# Lielāki faili netiek lejupielādēti (MB); šo paplašinājumu faili tiek izlaisti.
+download_max_mb = 200
+skip_extensions = [".mp4", ".mkv", ".avi", ".mov", ".wmv"]
+
+# Cik dienas uz priekšu skatīties termiņus
+lookahead_days = 150
+
+# Paziņojums (Windows/macOS/Linux/Termux), ja kopš iepriekšējās reizes kaut kas mainījies.
+# Visi jaunumi tiek rakstīti arī JAUNUMI.md un UZDEVUMI.md augšā.
+notify = true
+
+[schedule]
+# Automātiskās palaišanas laiki (install-schedule)
+times = ["07:30", "19:30"]
+
+[calendar]
+ics = true                       # izvades mapē raksta termini.ics
+include_text_dates = true        # kalendārā likt arī tekstā atrastos datumus (atzīmēti ar ❓)
+reminders_minutes = [1440, 120]  # atgādinājumi: 1 diena un 2 h pirms termiņa
+google = false                   # sinhronizēt ar Google Calendar (skat. README)
+google_credentials = "~/.estudijas_sync/credentials.json"
+google_calendar_name = "RTU estudijas"
+
+# Failu kategorijas: mapes nosaukums = regulārā izteiksme (reģistrnejūtīga).
+# Pārbauda secībā pēc faila un aktivitātes nosaukuma, tad pēc sadaļas nosaukuma.
+# Prezentācijas (.pptx, .ppt, .odp), kas neatbilst nevienai, nonāk "Lekcijas", pārējais — "Citi".
+[categories]
+"Kontroldarbi" = '(?<![^\W\d_])KD(?:\s*\d+)?(?![^\W\d_])|kontroldarb|kolokvij'
+"Mājas darbi" = '(?<![^\W\d_])MD(?:\s*\d+)?(?![^\W\d_])|mājas\s*darb|majas\s*darb|mājasdarb|homework'
+"Laboratorijas darbi" = '(?<![^\W\d_])LD(?:\s*\d+)?(?![^\W\d_])|laborator'
+"Praktiskie darbi" = '(?<![^\W\d_])PD(?:\s*\d+)?(?![^\W\d_])|praktisk\w*\s+(?:darb|nodarb|uzdev)|seminār'
+"Lekcijas" = 'lekc|lecture|prezent|slaid|slide'
+"Testi un eksāmeni" = '\btest\w*|\bquiz|eksām|ieskait'

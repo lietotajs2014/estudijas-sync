@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.zip
+.venv/
+venv/
+# Personīgie dati glabājas ~/.estudijas_sync, nevis šeit — bet drošības pēc:
+auth.json
+google_token.json
+credentials.json
+state.json
