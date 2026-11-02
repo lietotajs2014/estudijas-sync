@@ -31,6 +31,7 @@ services:
       - userdata:/data
     depends_on:
       db: { condition: service_healthy }
+    shm_size: "512mb"             # Chromium RTU pieteikšanai lapā (ms_login.py)
     networks: [internal, edge]
     # Porti uz āru netiek atvērti — pie web tiek tikai caur nginx vai cloudflared.
 

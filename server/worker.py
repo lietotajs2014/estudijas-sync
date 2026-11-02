@@ -1,7 +1,7 @@
 """Fona sinhronizācija: python -m server.worker
 
 - plānotajos laikos (SCHEDULE_TIMES, noklusējumā 07:30 un 19:30 Rīgas laikā) sinhronizē visus lietotājus;
-- ik pa 15 s pārbauda, vai kāds nav nospiedis "Sinhronizēt tagad".
+- ik pa 3 s pārbauda, vai kāds nav nospiedis "Sinhronizēt tagad" vai atzīmējis failus lejupielādei.
 Viens process, lietotāji pa vienam — lai nepārslogotu e-studijas un drauga datoru.
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 
 from .db import MoodleLink, SessionLocal, User, init_db
-from .runner import sync_user
+from .runner import FileProgress, download_for_user, sync_user
 from .settings import settings
 
 log = logging.getLogger("worker")
@@ -46,10 +46,11 @@ def run_one(user_id: int) -> None:
             return
         user.sync_requested = False
         db.commit()
+        fp = FileProgress(user_id, "Sinhronizācija")
         try:
-            res = sync_user(db, user)
-            log.info("user %s: %s kursi, %s termiņi, %s jauni faili", user.id, res.get("courses"),
-                     res.get("deadlines"), res.get("new"))
+            res = sync_user(db, user, prog=fp.prog)
+            log.info("user %s: %s kursi, %s termiņi", user.id, res.get("courses"), res.get("deadlines"))
+            fp.done(True, res.get("changes_text") or "Gatavs.")
         except Exception as e:
             log.exception("user %s sinhronizācija neizdevās", user_id)
             db.rollback()
@@ -57,6 +58,34 @@ def run_one(user_id: int) -> None:
             if user and not user.last_error:
                 user.last_error = str(e)[:2000]
                 db.commit()
+            fp.done(False, (user.last_error if user else None) or str(e))
+
+
+def download_one(user_id: int) -> None:
+    with SessionLocal() as db:
+        user = db.get(User, user_id)
+        if not user:
+            return
+        keys = [str(k) for k in (user.download_requested or [])][:2000]
+        user.download_requested = None
+        db.commit()
+        if not keys:
+            return
+        fp = FileProgress(user_id, "Lejupielāde")
+        try:
+            r = download_for_user(db, user, keys, prog=fp.prog)
+            msg = f"Lejupielādēti {len(r['done'])} faili."
+            if r.get("drive_uploaded"):
+                msg += f" Uz Google Drive: {r['drive_uploaded']}."
+            if r["errors"]:
+                msg += f" Neizdevās {len(r['errors'])}: " + "; ".join(r["errors"][:5])
+            for w in r.get("warnings") or []:
+                msg += f"\n{w}"
+            fp.done(not r["errors"] or bool(r["done"]), msg)
+        except Exception as e:
+            log.exception("user %s lejupielāde neizdevās", user_id)
+            db.rollback()
+            fp.done(False, str(e)[:2000])
 
 
 def linked_user_ids(only_requested: bool = False) -> list[int]:
@@ -65,6 +94,12 @@ def linked_user_ids(only_requested: bool = False) -> list[int]:
         if only_requested:
             q = q.where(User.sync_requested.is_(True))
         return list(db.scalars(q.order_by(User.id)))
+
+
+def download_user_ids() -> list[int]:
+    with SessionLocal() as db:
+        q = select(User.id, User.download_requested).join(MoodleLink).where(MoodleLink.valid.is_(True))
+        return [uid for uid, req in db.execute(q.order_by(User.id)) if req]
 
 
 def main() -> None:
@@ -86,11 +121,15 @@ def main() -> None:
                 if _stop:
                     break
                 run_one(uid)
+        for uid in download_user_ids():   # atzīmētie faili — ātri, tāpēc pirms sinhronizācijām
+            if _stop:
+                break
+            download_one(uid)
         for uid in linked_user_ids(only_requested=True):
             if _stop:
                 break
             run_one(uid)
-        for _ in range(15):
+        for _ in range(3):
             if _stop:
                 break
             time.sleep(1)

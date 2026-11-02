@@ -79,6 +79,8 @@ class Config:
     my_groups: list[str] = field(default_factory=list)
     only_categories: list[str] = field(default_factory=list)
     download_max_mb: float = 200
+    # False: sinhronizācija tikai uzskaita failus, lejupielādē tikai paneļa atzīmētos (web lapā)
+    auto_download: bool = True
     skip_extensions: list[str] = field(default_factory=list)
     lookahead_days: int = 150
     lookback_days: int = 200

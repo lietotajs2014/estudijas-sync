@@ -236,3 +236,105 @@ def test_pc_pair_module(monkeypatch, tmp_path):
     assert [c["name"] for c in sent["body"]["cookies"]] == ["MoodleSession"]
     with pytest.raises(pairmod.PairError):
         pairmod.pair(Cfg, "12")
+
+
+def _panel(client, monkeypatch, sub):
+    _login(client, monkeypatch, sub=sub)
+    page = client.get("/")
+    tok = re.search(r'const TOKEN = "([^"]+)"', page.text).group(1)
+    return page, {"X-Token": tok}
+
+
+def test_panel_web_mode(client, monkeypatch):
+    page, h = _panel(client, monkeypatch, "g-panel")
+    assert '"web" === "web"' in page.text and "__TOKEN__" not in page.text
+    assert "unsafe-inline" in page.headers["Content-Security-Policy"]
+    assert client.get("/api/status").status_code == 401                 # bez X-Token
+    st = client.get("/api/status", headers=h).json()
+    assert st["mode"] == "web" and st["auth"]["mode"] is None and st["job"] is None
+    assert st["ics_url"].startswith("http://testserver/cal/")
+    # bez e-studijām — sinhronizēt/ielādēt nevar
+    assert client.post("/api/job/sync", headers=h).status_code == 400
+    assert client.post("/api/download", json={"keys": ["a"]}, headers=h).status_code == 400
+
+    cfg = client.post("/api/config", headers=h, json={
+        "email": "janis@edu.rtu.lv", "program": "rmce0", "group": "3. grupa", "other_groups": "folder",
+        "exclude_courses": ["Sports"], "lookahead_days": 3, "download_max_mb": 50, "reminders_minutes": "1440, 60",
+        "drive_enabled": True}).json()["values"]
+    assert cfg["program"] == "RMCE0" and cfg["group"] == "3" and cfg["other_groups"] == "folder"
+    assert cfg["lookahead_days"] == 7 and cfg["reminders_minutes"] == [1440, 60]
+    assert cfg["drive_enabled"] is False                                  # Drive nav pieslēgts
+    assert client.post("/api/config", headers=h, json={"other_groups": "x"}).status_code == 400
+    assert client.get("/api/status", headers=h).json()["rtu_email"] == "janis@edu.rtu.lv"
+
+    # e-studijas pieslēgtas → "Sinhronizēt" un "Ielādēt atzīmētos" iet rindā worker
+    from server.db import MoodleLink
+    with SessionLocal() as db:
+        u = db.query(User).filter_by(google_sub="g-panel").one()
+        db.add(MoodleLink(user_id=u.id, mode="web", token_enc="", cookies_enc="x", fullname="Jānis"))
+        u.sync_requested = False
+        db.commit()
+        uid = u.id
+    r = client.post("/api/download", json={"keys": ["k1", "k2", "k1"]}, headers=h)
+    assert r.json()["ok"]
+    st = client.get("/api/status", headers=h).json()
+    assert st["auth"]["fullname"] == "Jānis" and st["job"] == {"name": "Lejupielāde", "queued": True}
+    with SessionLocal() as db:
+        assert db.get(User, uid).download_requested == ["k1", "k2"]
+
+    # faili: tikai lietotāja mapē, bez .estudijas-sync un ../
+    from server.runner import user_dir
+    d = user_dir(uid)
+    (d / "Fizika").mkdir(parents=True, exist_ok=True)
+    (d / "Fizika" / "MD1.pdf").write_bytes(b"%PDF-1.4 test")
+    (d / ".estudijas-sync").mkdir(exist_ok=True)
+    (d / ".estudijas-sync" / "state.json").write_text("{}")
+    assert client.get("/api/file", params={"path": "Fizika/MD1.pdf"}).content == b"%PDF-1.4 test"
+    assert client.get("/api/file", params={"path": ".estudijas-sync/state.json"}).status_code == 404
+    assert client.get("/api/file", params={"path": "../../test.db"}).status_code == 404
+    assert client.post("/api/zip", json={"keys": ["k1"]}, headers=h).status_code == 400   # nav ielādēts
+
+    # "Aizmirst piekļuvi" izdzēš sesiju
+    assert client.post("/api/logout", headers=h).json()["ok"]
+    assert client.get("/api/status", headers=h).json()["auth"]["mode"] is None
+
+
+def test_panel_ms_login_api(client, monkeypatch):
+    from server import ms_login
+
+    _page, h = _panel(client, monkeypatch, "g-ms")
+    started = {}
+
+    class FakeSession:
+        id, active = "sid", True
+
+        def snapshot(self, with_shot=False):
+            return {"step": "password", "id": "sid", "email": started["email"]}
+
+        def send(self, cmd):
+            started.setdefault("cmds", []).append(cmd)
+
+    def fake_start(uid, email, site, cb):
+        started.update(uid=uid, email=email, cb=cb)
+        return FakeSession()
+
+    monkeypatch.setattr(ms_login.registry, "start", fake_start)
+    monkeypatch.setattr(ms_login.registry, "get", lambda uid: FakeSession() if started else None)
+    assert client.get("/api/ms/state", headers=h).json() == {"step": "none"}
+    r = client.post("/api/ms/start", json={"email": "anna@edu.rtu.lv"}, headers=h).json()
+    assert r["ok"] and r["step"] == "password" and started["email"] == "anna@edu.rtu.lv"
+    assert client.post("/api/ms/input", json={"a": "password", "v": "slepena"}, headers=h).json()["ok"]
+    assert client.post("/api/ms/input", json={"a": "rm -rf"}, headers=h).status_code == 400
+    assert started["cmds"] == [{"a": "password", "v": "slepena"}]
+
+    # veiksmīga pieteikšanās saglabā šifrētu sesiju un atpazīto programmu/grupu
+    name = started["cb"](started["uid"], [{"name": "MoodleSession", "value": "zzz", "domain": "estudijas.rtu.lv",
+                                            "path": "/", "expires": -1, "httpOnly": True, "secure": True, "sameSite": "Lax"}],
+                         {"userid": 9, "fullname": "Anna", "courses": [], "program": "RMCE0", "group": "3",
+                          "program_candidates": [], "group_candidates": []})
+    assert name == "Anna"
+    with SessionLocal() as db:
+        u = db.get(User, started["uid"])
+        assert u.program == "RMCE0" and u.group == "3" and u.moodle.source == "lapa" and u.sync_requested
+        assert "zzz" not in u.moodle.cookies_enc and "zzz" in decrypt(u.moodle.cookies_enc)
+        assert (u.prefs or {}).get("rtu_email") == "anna@edu.rtu.lv"

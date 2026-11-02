@@ -185,9 +185,10 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .suggest { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .suggest button { text-align: left; border: 1px dashed var(--line); background: none; padding: 4px 8px; cursor: pointer; font-size: 13px; border-radius: var(--radius-s); }
 /* termiņa logs */
-dialog#dlg { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 2px solid var(--ink); border-radius: var(--radius-m);
+dialog#dlg, dialog#msdlg { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 2px solid var(--ink); border-radius: var(--radius-m);
   background: var(--sheet); color: var(--ink); padding: 18px 22px 22px; box-shadow: 0 18px 50px rgba(15, 34, 54, .28); }
-dialog#dlg::backdrop { background: rgba(15, 34, 54, .45); }
+dialog#msdlg { width: min(520px, calc(100vw - 24px)); }
+dialog#dlg::backdrop, dialog#msdlg::backdrop { background: rgba(15, 34, 54, .45); }
 .dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 #dlg-title { font: 700 26px/1.2 var(--font-head); margin: 10px 0 12px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0 0 16px; font-size: 15px; }
@@ -286,11 +287,25 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
   .dl { grid-template-columns: 52px 1fr; }
   .dl .side { grid-column: 2; text-align: left; }
 }
+/* web lapa (estudijas.lodelo.de): darbvirsmas lietas paslēptas, dažas tikai webā */
+.web .pc-only { display: none !important; }
+html:not(.web) .web-only { display: none !important; }
+.ms-form { display: grid; gap: 10px; margin: 6px 0 4px; }
+.ms-form input { font: inherit; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-s);
+  background: var(--sheet); color: var(--ink); width: 100%; box-sizing: border-box; }
+.ms-num { font: 700 64px/1 var(--font-head); text-align: center; letter-spacing: .04em; margin: 14px 0 6px; }
+.ms-err { color: var(--bad); font-weight: 500; }
+.ms-shot { display: block; width: 100%; max-width: 460px; margin: 8px auto; border: 1px solid var(--line); border-radius: var(--radius-s); cursor: crosshair; }
+.ms-opts { display: grid; gap: 8px; }
+.ms-opts .btn { text-align: left; justify-content: flex-start; }
+.ms-foot { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+.copyrow { display: flex; gap: 8px; }
+.copyrow input { flex: 1; min-width: 0; font: 13px/1.4 ui-monospace, monospace; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--paper, transparent); color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
-<div class="offline" id="offline" hidden role="alert">Savienojums ar programmu pazudis. Pārbaudi, vai <b>start.bat</b> logs ir atvērts; ja nav, palaid to vēlreiz un pārlādē šo lapu.</div>
+<div class="offline" id="offline" hidden role="alert"><span class="pc-only">Savienojums ar programmu pazudis. Pārbaudi, vai <b>start.bat</b> logs ir atvērts; ja nav, palaid to vēlreiz un pārlādē šo lapu.</span><span class="web-only">Nav savienojuma ar serveri. Pārbaudi internetu; lapa mēģinās vēlreiz pati.</span></div>
 <div class="sheet-top">
   <div class="wrap">
     <div class="head">
@@ -366,10 +381,10 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
     <!-- FAILI -->
     <section data-panel="faili" hidden>
       <div class="where">
-        <div><small>Faili tiek saglabāti mapē</small><b id="out-path">—</b><span id="out-warn"></span></div>
+        <div><small class="pc-only">Faili tiek saglabāti mapē</small><small class="web-only">Faili</small><b id="out-path">—</b><span id="out-warn"></span></div>
         <div class="row">
-          <button class="btn small" id="open-out" type="button">Atvērt mapi</button>
-          <button class="btn ghost small" id="goto-folder" type="button">Mainīt mapi</button>
+          <button class="btn small pc-only" id="open-out" type="button">Atvērt mapi</button>
+          <button class="btn ghost small pc-only" id="goto-folder" type="button">Mainīt mapi</button>
           <a class="btn ghost small" id="drive-link" target="_blank" rel="noopener" hidden>Atvērt Google Drive</a>
         </div>
       </div>
@@ -379,7 +394,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         <div class="field"><label for="ff-status">Statuss</label>
           <select id="ff-status">
             <option value="open">Neizpildītie</option><option value="donetask">Izpildītie</option><option value="">Visi</option>
-            <option value="notdl">Nav lejupielādēti</option><option value="missing">Nav mapē</option><option value="other">Citām grupām</option>
+            <option value="notdl">Nav lejupielādēti</option><option value="missing" class="pc-only">Nav mapē</option><option value="other">Citām grupām</option>
           </select></div>
         <div class="field grow"><label for="ff-q">Meklēt</label><input id="ff-q" type="search" placeholder="Faila, tēmas vai sadaļas nosaukums"></div>
       </div>
@@ -389,6 +404,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         <span class="muted" id="sel-count"></span>
         <span style="flex:1"></span>
         <button class="btn small" id="dl-selected" type="button" disabled>Lejupielādēt atzīmētos</button>
+        <button class="btn ghost small web-only" id="zip-selected" type="button" disabled>Saglabāt ZIP</button>
         <button class="btn ghost small" id="sel-clear" type="button" disabled>Notīrīt</button>
       </div>
       <div id="files"></div>
@@ -404,7 +420,8 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
           <div class="form-grid">
             <div class="field"><label for="f-email">RTU e-pasts</label>
               <input type="email" id="f-email" name="email" placeholder="vards.uzvards@edu.rtu.lv">
-              <div class="hint">Aizpilda Microsoft pieteikšanās logu. Parole netiek prasīta un nekur netiek glabāta.</div></div>
+              <div class="hint pc-only">Aizpilda Microsoft pieteikšanās logu. Parole netiek prasīta un nekur netiek glabāta.</div>
+              <div class="hint web-only">Ar to sākas RTU pieteikšanās. Paroli lapa nesaglabā.</div></div>
             <div class="field"><label for="f-program">Studiju programma</label>
               <input type="text" id="f-program" name="program" placeholder="RMCE0"></div>
             <div class="field"><label for="f-group">Grupa</label>
@@ -419,8 +436,9 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         </div>
 
         <div class="panel">
-          <h4>Faili datorā</h4>
-          <div class="field folder-field">
+          <h4><span class="pc-only">Faili datorā</span><span class="web-only">Faili</span></h4>
+          <p class="note web-only">Lapa dokumentus automātiski nelejupielādē: cilnē Faili redzams viss, kas ir estudijās, un serveris ielādē tikai tos, ko atzīmē.</p>
+          <div class="field folder-field pc-only">
             <label for="f-out">Mape, kurā tiek lejupielādēti faili</label>
             <div class="folder-row">
               <input type="text" id="f-out" data-ignore="1" spellcheck="false" placeholder="D:/RTU estudijas">
@@ -444,12 +462,14 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
             <div class="field"><label for="f-excl">Izslēgtie kursi</label>
               <textarea id="f-excl" name="exclude_courses" placeholder="Viens nosaukums vai tā daļa katrā rindā"></textarea></div>
           </div>
-          <div class="field" style="margin-top:14px"><label>Lejupielādēt kategorijas</label>
+          <div class="field pc-only" style="margin-top:14px"><label>Lejupielādēt kategorijas</label>
             <div class="cats" id="only-cats"></div>
             <div class="hint">Ja nekas nav atzīmēts, tiek lejupielādēts viss.</div></div>
         </div>
 
-        <div class="panel">
+        <div class="panel web-only" id="web-drive"></div>
+
+        <div class="panel pc-only">
           <h4>Google Drive</h4>
           <p class="note">Kopē izvēlētos failus uz mapi, ko sinhronizē Google Drive for desktop. Tā tie ir pieejami telefona Drive lietotnē un pārlūkā.</p>
           <label class="toggle"><input type="checkbox" name="drive_enabled" id="f-drive"> <span>Kopēt uz Drive</span></label>
@@ -469,23 +489,24 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 
         <div class="panel">
           <h4>Kalendārs</h4>
+          <div class="web-only" id="web-cal"></div>
           <div class="form-grid">
-            <div>
+            <div class="pc-only">
               <label class="toggle"><input type="checkbox" name="google" id="f-google"> <span>Google Calendar
                 <span class="hint muted" style="display:block;font-size:13px">Atsevišķā kalendārā, atjaunojas automātiski, redzams telefonā.</span></span></label>
             </div>
             <div>
-              <label class="toggle"><input type="checkbox" name="ics"> <span>termini.ics fails
+              <label class="toggle pc-only"><input type="checkbox" name="ics"> <span>termini.ics fails
                 <span class="hint muted" style="display:block;font-size:13px">Importēšanai Outlook vai Apple kalendārā.</span></span></label>
               <label class="toggle" style="margin-top:10px"><input type="checkbox" name="include_text_dates"> <span>Arī datumi no paziņojumiem</span></label>
             </div>
-            <div class="field"><label for="f-calname">Kalendāra nosaukums</label>
+            <div class="field pc-only"><label for="f-calname">Kalendāra nosaukums</label>
               <input type="text" id="f-calname" name="google_calendar_name"></div>
             <div class="field"><label for="f-rem">Atgādinājumi, minūtes pirms</label>
               <input type="text" id="f-rem" name="reminders_minutes" placeholder="1440, 120">
               <div class="hint">1440 = diena, 120 = divas stundas</div></div>
           </div>
-          <div class="field" style="margin-top:16px"><label for="f-creds">Google credentials.json atrašanās vieta</label>
+          <div class="field pc-only" style="margin-top:16px"><label for="f-creds">Google credentials.json atrašanās vieta</label>
             <div class="folder-row">
               <input type="text" id="f-creds" name="google_credentials" spellcheck="false" placeholder="C:/Users/…/Downloads/client_secret_….json">
               <button class="btn ghost small" type="button" id="pick-creds">Izvēlēties failu…</button>
@@ -495,12 +516,13 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         </div>
 
         <div class="panel">
-          <h4>Automātiskā sinhronizācija un paziņojumi</h4>
+          <h4>Automātiskā sinhronizācija<span class="pc-only"> un paziņojumi</span></h4>
+          <p class="note web-only" id="web-sched"></p>
           <div class="form-grid">
-            <div class="field"><label for="f-times">Laiki</label>
+            <div class="field pc-only"><label for="f-times">Laiki</label>
               <input type="text" id="f-times" name="schedule_times" placeholder="07:30, 19:30">
               <div class="row"><span id="sched-state"></span><button class="btn ghost small" type="button" id="sched-btn"></button></div></div>
-            <div>
+            <div class="pc-only">
               <label class="toggle"><input type="checkbox" name="notify"> <span>Paziņojums, ja kaut kas jauns</span></label>
             </div>
             <div class="field"><label for="f-look">Termiņi uz priekšu, dienas</label>
@@ -512,7 +534,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
           <button class="btn" type="submit">Saglabāt iestatījumus</button>
           <span class="muted" id="save-state"></span>
           <span style="flex:1"></span>
-          <button class="btn ghost small" type="button" id="open-config">Atvērt config.toml</button>
+          <button class="btn ghost small pc-only" type="button" id="open-config">Atvērt config.toml</button>
         </div>
       </form>
     </section>
@@ -528,7 +550,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
       <h3 id="help-log">Žurnāls</h3>
       <div class="filters">
         <button class="btn small ghost" type="button" id="reload-log">Atjaunot</button>
-        <button class="btn small ghost" type="button" id="open-data">Atvērt datu mapi</button>
+        <button class="btn small ghost pc-only" type="button" id="open-data">Atvērt datu mapi</button>
       </div>
       <div id="lastjob"></div>
       <pre class="log" id="log"></pre>
@@ -537,7 +559,9 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 
   <footer>
     <span id="ver"></span>
-    <button class="link" type="button" id="btn-update">Atjaunināt no GitHub</button>
+    <button class="link pc-only" type="button" id="btn-update">Atjaunināt no GitHub</button>
+    <a class="link web-only" href="/privacy">Privātums</a>
+    <button class="link web-only" type="button" id="btn-logout">Iziet</button>
     <button class="link" type="button" id="theme">Mainīt tēmu</button>
   </footer>
 </div>
@@ -549,6 +573,14 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
   <h2 id="dlg-title"></h2>
   <div id="dlg-body"></div>
 </dialog>
+<dialog id="msdlg" aria-labelledby="ms-title">
+  <div class="dlg-head">
+    <div class="muted">RTU konts · Microsoft</div>
+    <button class="btn ghost small" type="button" id="ms-close" aria-label="Aizvērt">Aizvērt</button>
+  </div>
+  <h2 id="ms-title" style="font:700 24px/1.2 var(--font-head);margin:10px 0 8px">Pieteikties e-studijās</h2>
+  <div id="ms-body"></div>
+</dialog>
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -556,6 +588,8 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 <script>
 "use strict";
 const TOKEN = "__TOKEN__";
+const WEB = "__MODE__" === "web";   // web lapa (estudijas.lodelo.de): serveris aizvieto ar "web"
+if (WEB) document.documentElement.classList.add("web");
 const KIND = {
   KD: "var(--kd)", "Eksāmens": "var(--kd)", Tests: "var(--test)", MD: "var(--md)",
   LD: "var(--ld)", PD: "var(--ld)", "Termiņš": "var(--muted)", Uzdevums: "var(--muted)", Notikums: "var(--other)"
@@ -578,7 +612,10 @@ const el = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
-const OFFLINE_MSG = "Panelis nesasniedz programmu. Pārbaudi, vai start.bat logs ir atvērts (ja nav, palaid start.bat vēlreiz), un pārlādē šo lapu.";
+if (WEB) $$(".pc-only").forEach(x => x.remove());   // darbvirsmas lietas webā nav vajadzīgas
+
+const OFFLINE_MSG = WEB ? "Nav savienojuma ar serveri. Pārbaudi internetu un mēģini vēlreiz."
+  : "Panelis nesasniedz programmu. Pārbaudi, vai start.bat logs ir atvērts (ja nav, palaid start.bat vēlreiz), un pārlādē šo lapu.";
 async function api(path, opts = {}) {
   let r;
   try {
@@ -588,10 +625,13 @@ async function api(path, opts = {}) {
     throw new Error(OFFLINE_MSG);
   }
   setOffline(false);
-  if (r.status === 401) throw new Error("Panelis ir pārstartēts. Pārlādē lapu (F5).");
+  if (r.status === 401) {
+    if (WEB) { setTimeout(() => location.reload(), 2500); throw new Error("Sesija beigusies, pārlādēju lapu…"); }
+    throw new Error("Panelis ir pārstartēts. Pārlādē lapu (F5).");
+  }
   const ct = r.headers.get("content-type") || "";
   const data = ct.includes("json") ? await r.json() : await r.text();
-  if (!r.ok) throw new Error((data && (data.error || data.message)) || `HTTP ${r.status}`);
+  if (!r.ok) throw new Error((data && (data.error || data.message || (typeof data.detail === "string" && data.detail))) || `HTTP ${r.status}`);
   return data;
 }
 function setOffline(off) {
@@ -730,9 +770,15 @@ async function loadStatus() {
     renderLastJob();
   }
   renderAccount();
-  renderSchedule();
-  $("#gcal-warn").hidden = !(CONFIG && CONFIG.values.google && STATUS.google_credentials && !STATUS.google_token);
-  if (CONFIG) renderGcalRow();
+  if (WEB) {
+    renderWebPanels();
+    if (s.flash) { toast(s.flash.msg, s.flash.kind === "err"); }
+    if (s.tab) showTab(s.tab);
+  } else {
+    renderSchedule();
+    $("#gcal-warn").hidden = !(CONFIG && CONFIG.values.google && STATUS.google_credentials && !STATUS.google_token);
+    if (CONFIG) renderGcalRow();
+  }
   clearTimeout(pollTimer);
   pollTimer = setTimeout(loadStatus, busy ? 800 : 8000);
 }
@@ -826,8 +872,12 @@ function dlRow(d) {
 function renderDeadlines() {
   const list = $("#dl-list"); list.replaceChildren();
   if (!STATUS.auth || !STATUS.auth.mode) {
-    list.append(el("div", { class: "empty" }, el("p", { text: "Vispirms piesakies ar savu RTU kontu." }),
-      el("button", { class: "btn", type: "button", onclick: startLogin }, "Pieteikties")));
+    const expired = WEB && STATUS.auth && STATUS.auth.expired;
+    list.append(el("div", { class: "empty" },
+      el("p", { text: expired ? "E-studiju piekļuve beigusies. Piesakies ar RTU kontu no jauna — pietiek ar telefonu."
+        : WEB ? "Piesakies ar savu RTU kontu, lai lapa varētu nolasīt tavas estudijas. Dators nav vajadzīgs."
+        : "Vispirms piesakies ar savu RTU kontu." }),
+      el("button", { class: "btn", type: "button", onclick: startLogin }, expired ? "Pieteikties no jauna" : "Pieteikties")));
     $("#cnt-dl").textContent = ""; return;
   }
   if (!VIEW.generated) {
@@ -922,7 +972,9 @@ function deadlineOrder(a, b) {
   if ((ta >= now) !== (tb >= now)) return ta >= now ? -1 : 1;   // gaidāmie vispirms
   return ta >= now ? ta - tb : tb - ta;                          // tuvākie augšā, pagājušie — jaunākie augšā
 }
-const ST_LABEL = { here: "ir mapē", missing: "nav mapē", notdl: "nav lejupielādēts", other: "citai grupai", error: "kļūda" };
+const ST_LABEL = WEB ? { here: "ielādēts", missing: "nav serverī", notdl: "estudijās", other: "citai grupai", error: "kļūda" }
+  : { here: "ir mapē", missing: "nav mapē", notdl: "nav lejupielādēts", other: "citai grupai", error: "kļūda" };
+const DL_WORD = WEB ? "Ielādēt" : "Lejupielādēt";
 function fileState(f) {
   if (f.status === "downloaded") return f.exists ? "here" : "missing";
   if (f.status === "other" || f.other_group) return f.status === "downloaded" ? "here" : "other";
@@ -931,7 +983,8 @@ function fileState(f) {
 }
 function fileWhy(f) {
   return { unselected: "kategorija nav atlasīta iestatījumos", other: "citai grupai vai programmai", ext: "izlaists pēc faila tipa",
-    big: "lielāks par atļauto izmēru", error: "lejupielāde neizdevās", pending: "vēl nav lejupielādēts" }[f.status] || "";
+    big: "lielāks par atļauto izmēru", error: "lejupielāde neizdevās", pending: "vēl nav lejupielādēts",
+    available: "ir estudijās; atzīmē, lai ielādētu" }[f.status] || "";
 }
 function fileTime(f) {
   const t = f.created > 1e9 ? f.created : f.modified > 1e9 ? f.modified : 0;
@@ -950,7 +1003,11 @@ async function loadFiles() {
   const missing = FD.files.filter(f => fileState(f) === "missing").length;
   $("#out-warn").textContent = !FD.exists ? "Šī mape vēl neeksistē. Tā tiks izveidota pirmajā sinhronizācijā."
     : missing ? `${missing} lejupielādēti faili šajā mapē nav atrodami (izdzēsti vai pārvietoti). Atzīmē tos un lejupielādē vēlreiz.` : "";
-  const dlLink = CONFIG && CONFIG.values.drive_link;
+  const dlLink = WEB ? (STATUS.drive && STATUS.drive.enabled ? "https://drive.google.com/drive/search?q=%22RTU%20estudijas%22" : "")
+    : CONFIG && CONFIG.values.drive_link;
+  if (WEB) $("#out-warn").style.color = "var(--ink-soft)";
+  if (WEB) $("#out-warn").textContent = "Netiek lejupielādēti automātiski. Atzīmē vajadzīgos un spied “Ielādēt atzīmētos”: tad tos var atvērt šeit"
+    + (STATUS.drive && STATUS.drive.enabled ? " un tie parādās tavā Google Drive mapē “RTU estudijas”." : " (vai ieslēdz Google Drive iestatījumos).");
   $("#drive-link").hidden = !dlLink; if (dlLink) $("#drive-link").href = dlLink;
   buildFileFilters(); renderFiles();
   if (VIEW.generated) renderDeadlines();
@@ -1021,8 +1078,9 @@ function fileRow(f, fdl, seq) {
     onchange: e => { e.target.checked ? sel.add(f.key) : sel.delete(f.key); tr.classList.toggle("sel", e.target.checked); updateBulk(); } });
   const act = st === "here"
     ? [el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt"),
-       el("button", { class: "btn ghost small", type: "button", onclick: () => reveal(f.path) }, "Parādīt mapē")]
-    : [el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, "Lejupielādēt")];
+       WEB ? el("a", { class: "btn ghost small", href: fileUrl(f.path, true) }, "Saglabāt")
+         : el("button", { class: "btn ghost small", type: "button", onclick: () => reveal(f.path) }, "Parādīt mapē")]
+    : [el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, DL_WORD)];
   const tr = el("tr", { class: sel.has(f.key) ? "sel" : "" },
     el("td", { class: "c" }, cb),
     el("td", { class: "name" }, el("b", { text: f.filename }), el("small", { text: [f.module !== f.filename ? f.module : "", f.section].filter(Boolean).join(", ") }),
@@ -1065,10 +1123,12 @@ function updateBulk() {
   const vis = visibleFiles();
   $("#sel-count").textContent = sel.size ? `Atzīmēti ${sel.size}` : `${vis.length} faili`;
   $("#dl-selected").disabled = !sel.size; $("#sel-clear").disabled = !sel.size;
+  if (WEB) { $("#dl-selected").textContent = "Ielādēt atzīmētos";
+    $("#zip-selected").disabled = !(FD.files || []).some(f => sel.has(f.key) && fileState(f) === "here"); }
   $("#sel-all").checked = vis.length > 0 && vis.every(f => sel.has(f.key));
 }
 async function downloadKeys(keys) {
-  try { await post("/api/download", { keys }); toast(`Lejupielādē ${keys.length} ${keys.length === 1 ? "failu" : "failus"}…`); setTimeout(loadStatus, 200); }
+  try { await post("/api/download", { keys }); toast(`${WEB ? "Ielādē" : "Lejupielādē"} ${keys.length} ${keys.length === 1 ? "failu" : "failus"}…`); setTimeout(loadStatus, 200); }
   catch (e) { toast(e.message, true); }
 }
 async function reveal(p) { try { await post("/api/reveal", { path: p }); } catch (e) { toast(e.message, true); } }
@@ -1140,11 +1200,11 @@ function openDeadline(d) {
       const st = fileState(f);
       return el("li", {}, el("span", { text: f.filename }), el("span", { class: "st " + st, style: "flex:none", text: ST_LABEL[st] }),
         st === "here" ? el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt")
-          : el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, "Lejupielādēt"));
+          : el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, DL_WORD));
     })));
     const missing = files.filter(f => fileState(f) !== "here");
     if (missing.length > 1) body.push(el("button", { class: "btn small", type: "button", style: "margin:-6px 0 16px",
-      onclick: () => downloadKeys(missing.map(f => f.key)) }, `Lejupielādēt visus ${missing.length}`));
+      onclick: () => downloadKeys(missing.map(f => f.key)) }, `${DL_WORD} visus ${missing.length}`));
   }
   const cons = consultFor(d.course_id);
   const overdueD = !d.done && d.status && new Date(d.due) < new Date();
@@ -1163,7 +1223,9 @@ function openDeadline(d) {
   dlg.showModal();
 }
 
+function fileUrl(p, save = false) { return `/api/file?path=${encodeURIComponent(p)}${save ? "&download=1" : ""}`; }
 async function openPath(p) {
+  if (WEB) { if (p && !p.startsWith("@")) window.open(fileUrl(p), "_blank", "noopener"); return; }
   try { await post("/api/open", { path: p }); } catch (e) { toast(e.message, true); }
 }
 
@@ -1179,8 +1241,9 @@ async function loadConfig() {
   }
   const catBox = (id, selected) => { const b = $(id); b.replaceChildren(...CONFIG.categories.map(c =>
     el("label", { class: "check" }, el("input", { type: "checkbox", value: c, checked: selected.includes(c) }), c))); };
-  catBox("#only-cats", v.only_categories); catBox("#drive-cats", v.drive_categories);
-  $("#f-out").value = v.output_dir; $("#move-box").hidden = true;
+  if ($("#only-cats")) catBox("#only-cats", v.only_categories);
+  if ($("#drive-cats")) catBox("#drive-cats", v.drive_categories);
+  if ($("#f-out")) { $("#f-out").value = v.output_dir; $("#move-box").hidden = true; }
   if (!VIEW.filter) $("#st-filter").textContent = v.program ? `${v.program}, ${v.group || "?"}. gr.` : "nav norādīta";
   renderGcalRow();
 }
@@ -1188,8 +1251,8 @@ function formValues() {
   const f = $("#cfg-form"), out = {};
   for (const inp of $$("[name]", f)) out[inp.name] = inp.type === "checkbox" ? inp.checked
     : inp.type === "number" ? Number(inp.value) : inp.value;
-  out.only_categories = $$("#only-cats input:checked").map(i => i.value);
-  out.drive_categories = $$("#drive-cats input:checked").map(i => i.value);
+  if ($("#only-cats")) out.only_categories = $$("#only-cats input:checked").map(i => i.value);
+  if ($("#drive-cats")) out.drive_categories = $$("#drive-cats input:checked").map(i => i.value);
   out.exclude_courses = out.exclude_courses.split("\n").map(s => s.trim()).filter(Boolean);
   return out;
 }
@@ -1237,6 +1300,7 @@ function renderSchedule() {
 
 /* ---------- konts ---------- */
 function renderAccount() {
+  if (WEB) return renderWebAccount();
   const a = STATUS.auth || {}, box = $("#account"); if (!box) return;
   const kids = [el("h4", { text: "RTU konts" }), el("p", { class: "note", text: "Pieteikšanās atver Microsoft logu: tur ievadi paroli un MFA kodu. Paroli neredz ne skripts, ne panelis; piekļuves atslēgu var atsaukt estudijās (Preferences, Security keys)." })];
   if (!a.mode) {
@@ -1272,13 +1336,202 @@ function renderAccount() {
   box.replaceChildren(...kids);
 }
 
+/* ---------- web lapa: konts, Drive, kalendārs ---------- */
+function postForm(action, fields = {}) {
+  const f = el("form", { method: "post", action, style: "display:none" },
+    el("input", { type: "hidden", name: "csrf", value: TOKEN }),
+    ...Object.entries(fields).map(([k, v]) => el("input", { type: "hidden", name: k, value: v })));
+  document.body.append(f); f.submit();
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Nokopēts"); }
+  catch (e) { toast("Nokopē saiti pats (iezīmē un Ctrl+C)", true); }
+}
+function renderWebAccount() {
+  const a = STATUS.auth || {}, box = $("#account"); if (!box) return;
+  const kids = [el("h4", { text: "RTU konts" })];
+  if (a.mode) {
+    const days = a.obtained ? Math.round((Date.now() - new Date(a.obtained)) / 86400000) : null;
+    kids.push(el("table", {}, el("tbody", {},
+      el("tr", {}, el("td", { text: "Lietotājs" }), el("td", { text: a.fullname || VIEW.user || "—" })),
+      el("tr", {}, el("td", { text: "Statuss" }), el("td", {}, el("span", { class: "pill ok", text: "pieslēgts" }))),
+      el("tr", {}, el("td", { text: "Pieteicies" }), el("td", { text: a.obtained ? `${fmtDate(a.obtained)} (pirms ${days} d.)` : "—" })))));
+  } else if (a.expired) {
+    kids.push(el("p", {}, el("span", { class: "pill warn", text: "piekļuve beigusies" })),
+      el("p", { class: "note", text: STATUS.last_error || "Microsoft prasa pieteikties no jauna." }));
+  } else {
+    kids.push(el("p", { class: "note", text: "Nav pieslēgts. Piesakies ar RTU e-pastu, paroli un Authenticator apstiprinājumu — tieši šeit, arī no telefona." }));
+  }
+  kids.push(el("div", { class: "row" },
+    el("button", { class: a.mode ? "btn ghost" : "btn", type: "button", onclick: openMsLogin }, a.mode ? "Pieteikties no jauna" : "Pieteikties ar RTU kontu"),
+    a.mode || a.expired ? el("button", { class: "btn danger small", type: "button", onclick: async () => {
+      if (!confirm("Izdzēst e-studiju sesiju no servera? Termiņi un faili paliek, bet sinhronizācija apstāsies.")) return;
+      try { await post("/api/logout"); toast("E-studiju sesija izdzēsta no servera"); loadStatus(); } catch (e) { toast(e.message, true); }
+    } }, "Aizmirst piekļuvi") : null),
+    el("p", { class: "note", text: "Parole tiek ierakstīta Microsoft pieteikšanās logā servera pārlūkā un uzreiz aizmirsta: to neglabā ne lapa, ne serveris. Paliek tikai e-studiju sesija (šifrēta), ko vari izdzēst jebkurā brīdī." }),
+    el("p", { class: "note" }, "Cits veids: ", el("a", { href: "/connect", text: "savienošanas kods no Android lietotnes vai PC programmas" }), "."));
+
+  kids.push(el("h4", { text: "Lapas konts", style: "margin-top:1.2em" }),
+    el("p", { class: "note", text: `Pieteicies ar Google: ${STATUS.account ? STATUS.account.email : ""}` }),
+    el("div", { class: "row" },
+      el("button", { class: "btn ghost small", type: "button", onclick: () => postForm("/logout") }, "Iziet"),
+      el("button", { class: "btn danger small", type: "button", onclick: () => {
+        const v = prompt("Tiks dzēsti visi tavi dati serverī (termiņi, ielādētie faili, sesija). Ieraksti “dzēst”, lai apstiprinātu.");
+        if (v && v.trim().toLowerCase() === "dzēst") postForm("/settings/delete", { confirm: "dzēst" });
+      } }, "Dzēst kontu")));
+  box.replaceChildren(...kids);
+}
+function renderWebPanels() {
+  const d = STATUS.drive || {}, box = $("#web-drive");
+  if (box) {
+    const chk = el("input", { type: "checkbox", name: "drive_enabled", checked: !!d.enabled, disabled: !d.connected,
+      onchange: () => saveConfig() });
+    box.replaceChildren(el("h4", { text: "Google Drive" }),
+      el("p", { class: "note", text: "Faili, ko atzīmē un ielādē, tiek ielikti arī tavā Google Drive mapē “RTU estudijas” (pa kursiem). Tā tie ir telefona Drive lietotnē. Lapa redz tikai pašas izveidotos failus." }),
+      el("label", { class: "toggle" }, chk, el("span", { text: "Likt ielādētos failus Google Drive" })),
+      el("div", { class: "row", style: "margin-top:10px" },
+        d.connected ? el("span", { class: "pill ok", text: "Drive pieslēgts" }) : el("span", { class: "pill warn", text: "nav pieslēgts" }),
+        d.connected ? el("a", { class: "btn ghost small", href: "https://drive.google.com/drive/search?q=%22RTU%20estudijas%22", target: "_blank", rel: "noopener" }, "Atvērt Drive")
+          : el("button", { class: "btn small", type: "button", onclick: () => postForm("/settings/drive/connect") }, "Pieslēgt Google Drive"),
+        d.connected ? el("button", { class: "btn ghost small", type: "button", onclick: () => { if (confirm("Atvienot Google Drive?")) postForm("/settings/drive/disconnect"); } }, "Atvienot") : null));
+  }
+  const cal = $("#web-cal");
+  if (cal && STATUS.ics_url) {
+    const inp = el("input", { readonly: true, value: STATUS.ics_url, "aria-label": "Kalendāra saite", onfocus: e => e.target.select() });
+    cal.replaceChildren(
+      el("p", { class: "note", text: "Termiņi Google Calendar: Google Calendar → Citi kalendāri → + → No URL → ielīmē šo saiti. Google to atjauno pats ik pēc dažām stundām." }),
+      el("div", { class: "copyrow" }, inp, el("button", { class: "btn small", type: "button", onclick: () => copyText(STATUS.ics_url) }, "Kopēt")),
+      el("div", { class: "row", style: "margin:10px 0 16px" },
+        el("a", { class: "btn ghost small", href: "https://calendar.google.com/calendar/r/settings/addbyurl", target: "_blank", rel: "noopener" }, "Atvērt Google Calendar"),
+        el("button", { class: "btn ghost small", type: "button", onclick: () => {
+          if (confirm("Nomainīt saiti? Vecā pārstās strādāt, un jaunā būs jāpievieno Google Calendar no jauna.")) postForm("/settings/ics/reset"); } }, "Nomainīt saiti")),
+      el("p", { class: "hint", text: "Saite ir slepena: kas to zina, redz tavus termiņus. Nedod to citiem." }));
+  }
+  const sc = $("#web-sched");
+  if (sc) sc.textContent = `Serveris sinhronizē pats katru dienu ${(STATUS.schedule.times || []).join(" un ")}. Dators nav jāieslēdz.`;
+}
+
+/* ---------- web lapa: RTU pieteikšanās ---------- */
+let msTimer = null, msKey = "", msShot = false, msActive = false;
+function openMsLogin() {
+  const dlg = $("#msdlg");
+  if (!dlg.open) dlg.showModal();
+  msShot = false; msKey = "";
+  renderMs({ step: "start" });
+}
+function msInput(cmd) { return post("/api/ms/input", cmd).catch(e => toast(e.message, true)); }
+function msField(attrs, label, onsubmit) {
+  const inp = el("input", attrs);
+  const form = el("form", { class: "ms-form", onsubmit: e => { e.preventDefault(); if (inp.value.trim()) { onsubmit(inp.value); } } },
+    el("label", { class: "muted", for: attrs.id, text: label }), inp, el("button", { class: "btn", type: "submit" }, "Turpināt"));
+  setTimeout(() => inp.focus(), 50);
+  return form;
+}
+async function msStart(email) {
+  try {
+    const r = await post("/api/ms/start", { email });
+    msActive = true; msKey = ""; renderMs(r); msPoll();
+  } catch (e) { renderMs({ step: "error", message: e.message }); }
+}
+async function msPoll() {
+  clearTimeout(msTimer);
+  if (!$("#msdlg").open) return;
+  try {
+    const st = await api(`/api/ms/state${msShot ? "?shot=1" : ""}`);
+    renderMs(st);
+    if (["done", "error", "cancelled", "none"].includes(st.step)) { msActive = false; return; }
+  } catch (e) { /* tīkls — mēģinām vēlreiz */ }
+  msTimer = setTimeout(msPoll, 1000);
+}
+function renderMs(st) {
+  const shotImg = $("#ms-shot");
+  if (shotImg && st.shot) shotImg.src = st.shot;
+  const key = JSON.stringify([st.step, st.message, st.error, st.number, st.options, st.text, msShot, !!st.shot]);
+  if (key === msKey) return;
+  msKey = key;
+  const kids = [], step = st.step;
+  if (step === "start") {
+    const email = STATUS.rtu_email || (CONFIG && CONFIG.values.email) || "";
+    kids.push(el("p", { class: "note", text: "Piesakies ar RTU kontu tāpat kā estudijās. Paroli lapa ieraksta Microsoft logā un nesaglabā." }),
+      msField({ id: "ms-email", type: "email", autocomplete: "username", value: email, placeholder: "vards.uzvards@edu.rtu.lv", required: true },
+        "RTU e-pasts", v => msStart(v.trim())));
+  } else if (step === "email") {
+    if (st.error) kids.push(el("p", { class: "ms-err", text: st.error }));
+    kids.push(msField({ id: "ms-email", type: "email", autocomplete: "username", value: st.email || "", required: true },
+      "RTU e-pasts", v => msInput({ a: "email", v: v.trim() })));
+  } else if (step === "password") {
+    if (st.error) kids.push(el("p", { class: "ms-err", text: st.error }));
+    kids.push(el("input", { type: "email", autocomplete: "username", value: st.email || "", hidden: true, readonly: true }),
+      msField({ id: "ms-pass", type: "password", autocomplete: "current-password", required: true },
+        `Parole${st.who || st.email ? ` (${st.who || st.email})` : ""}`, v => { $("#ms-pass").value = ""; msInput({ a: "password", v }); }));
+  } else if (step === "number") {
+    kids.push(el("p", { text: "Atver Microsoft Authenticator telefonā un ievadi šo skaitli:" }),
+      el("div", { class: "ms-num", text: st.number }),
+      el("p", { class: "note", text: "Kad apstiprināsi, šis logs turpinās pats. Ja lietotne neko neparāda, atver to un pavelc uz leju." }));
+  } else if (step === "approve") {
+    kids.push(el("p", { text: st.text || "Apstiprini pieteikšanos Microsoft Authenticator lietotnē." }),
+      el("p", { class: "note", text: "Kad apstiprināsi, šis logs turpinās pats." }));
+  } else if (step === "otp") {
+    if (st.error) kids.push(el("p", { class: "ms-err", text: st.error }));
+    if (st.text) kids.push(el("p", { class: "note", text: st.text }));
+    kids.push(msField({ id: "ms-otp", type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "10", required: true },
+      "Kods", v => msInput({ a: "otp", v })));
+  } else if (step === "choose") {
+    kids.push(el("p", { text: "Kā apstiprināt pieteikšanos?" }),
+      el("div", { class: "ms-opts" }, (st.options || []).map((o, i) =>
+        el("button", { class: "btn ghost", type: "button", onclick: () => msInput({ a: "choose", i }) }, o))));
+  } else if (step === "done") {
+    kids.push(el("p", {}, el("span", { class: "pill ok", text: "pieslēgts" }), " ", st.fullname || ""),
+      el("p", { text: st.message || "E-studijas pieslēgtas." }),
+      st.program ? el("p", { class: "note", text: `Atpazīts: ${st.program}${st.group ? `, ${st.group}. grupa` : ""}. Ja tas nav pareizi, nomaini iestatījumos.` }) : null,
+      el("div", { class: "ms-foot" }, el("button", { class: "btn", type: "button", onclick: () => $("#msdlg").close() }, "Gatavs")));
+    loadStatus(); loadConfig().catch(() => { });
+  } else if (step === "error" || step === "cancelled" || step === "none") {
+    kids.push(el("p", { class: step === "error" ? "ms-err" : "note", text: st.message || "Pieteikšanās nav aktīva." }),
+      el("div", { class: "ms-foot" }, el("button", { class: "btn", type: "button", onclick: () => { msKey = ""; renderMs({ step: "start" }); } }, "Mēģināt vēlreiz")));
+  } else {
+    kids.push(el("p", { class: "note", text: st.message || "Ielādē…" }));
+    if (step === "unknown" && st.text && !st.shot) kids.push(el("pre", { class: "fulltext", text: st.text }));
+  }
+  const live = !["start", "done", "error", "cancelled", "none"].includes(step);
+  if (live && (msShot || step === "unknown")) {
+    if (!msShot) { msShot = true; }
+    const img = el("img", { id: "ms-shot", class: "ms-shot", alt: "Microsoft pieteikšanās ekrāns", src: st.shot || "",
+      onclick: e => { const r = e.target.getBoundingClientRect();
+        msInput({ a: "click", x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }); } });
+    const t = el("input", { type: "text", placeholder: "Teksts, ko ierakstīt", autocomplete: "off", style: "flex:1;min-width:0" });
+    kids.push(el("p", { class: "hint", text: "Uzspied uz ekrāna vietas, lai to izvēlētos, un raksti zemāk." }), img,
+      el("div", { class: "copyrow" }, t, el("button", { class: "btn small", type: "button", onclick: () => { if (t.value) { msInput({ a: "type", v: t.value }); t.value = ""; } } }, "Rakstīt")),
+      el("div", { class: "row", style: "margin-top:6px" }, ["Enter", "Tab", "Backspace"].map(k =>
+        el("button", { class: "btn ghost small", type: "button", onclick: () => msInput({ a: "key", v: k }) }, k)),
+        el("button", { class: "btn ghost small", type: "button", onclick: () => msInput({ a: "back" }) }, "Atpakaļ")));
+  }
+  if (live) kids.push(el("div", { class: "ms-foot" },
+    ["number", "approve", "otp"].includes(step) ? el("button", { class: "linkish", type: "button", onclick: () => msInput({ a: "other" }) }, "Cits apstiprināšanas veids") : null,
+    !msShot ? el("button", { class: "linkish", type: "button", onclick: () => { msShot = true; msInput({ a: "shot", on: true }); msKey = ""; renderMs(st); } }, "Rādīt Microsoft ekrānu") : null,
+    el("span", { style: "flex:1" }),
+    el("button", { class: "btn ghost small", type: "button", onclick: () => { msInput({ a: "cancel" }); $("#msdlg").close(); } }, "Atcelt")));
+  $("#ms-body").replaceChildren(...kids.flat().filter(Boolean));
+}
+$("#ms-close").addEventListener("click", () => $("#msdlg").close());
+$("#msdlg").addEventListener("close", () => { clearTimeout(msTimer); if (msActive) { msActive = false; post("/api/ms/input", { a: "cancel" }).catch(() => { }); } });
+$("#zip-selected")?.addEventListener("click", async () => {
+  try {
+    const r = await fetch("/api/zip", { method: "POST", headers: { "X-Token": TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ keys: [...sel] }) });
+    if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
+    const url = URL.createObjectURL(await r.blob());
+    el("a", { href: url, download: "estudijas.zip" }).click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+  } catch (e) { toast(e.message, true); }
+});
+$("#btn-logout")?.addEventListener("click", () => postForm("/logout"));
+
 /* ---------- darbi ---------- */
 async function runJob(name) {
   try { await post(`/api/job/${name}`); setTimeout(loadStatus, 200); }
   catch (e) { toast(e.message, true); }
 }
 const startSync = () => runJob("sync");
-const startLogin = () => { toast("Atveras Microsoft pieteikšanās logs…"); runJob("login"); };
+const startLogin = () => { if (WEB) return openMsLogin(); toast("Atveras Microsoft pieteikšanās logs…"); runJob("login"); };
 function renderLastJob() {
   const j = STATUS.last_job, box = $("#lastjob"); box.replaceChildren();
   if (j) box.append(el("div", { class: "panel" }, el("h4", { text: `${j.name}, ${fmtDate(j.finished)}` }),
@@ -1304,7 +1557,7 @@ function showTab(name) {
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("#btn-sync").addEventListener("click", startSync);
 $("#q").addEventListener("input", e => { ui.q = e.target.value; renderDeadlines(); });
-$("#gcal-reconnect").addEventListener("click", () => runJob("gcal"));
+$("#gcal-reconnect")?.addEventListener("click", () => runJob("gcal"));
 $("#cq").addEventListener("input", renderConsult);
 $("#show-past").addEventListener("click", () => { ui.showPast = !ui.showPast; renderDeadlines(); });
 $("#dlg-close").addEventListener("click", () => $("#dlg").close());
@@ -1317,12 +1570,12 @@ $("#dl-selected").addEventListener("click", () => downloadKeys([...sel]));
 $("#show-done").addEventListener("change", e => { ui.showDone = e.target.checked; renderDeadlines(); renderTimeline(); });
 $("#show-text").addEventListener("change", e => { ui.showText = e.target.checked; renderDeadlines(); renderTimeline(); });
 $("#cfg-form").addEventListener("submit", saveConfig);
-$("#open-out").addEventListener("click", () => openPath(""));
-$("#goto-folder").addEventListener("click", () => { showTab("iestatijumi"); $("#f-out").focus(); });
-$("#open-config").addEventListener("click", () => openPath("@config"));
-$("#open-data").addEventListener("click", () => openPath("@data"));
+$("#open-out")?.addEventListener("click", () => openPath(""));
+$("#goto-folder")?.addEventListener("click", () => { showTab("iestatijumi"); $("#f-out").focus(); });
+$("#open-config")?.addEventListener("click", () => openPath("@config"));
+$("#open-data")?.addEventListener("click", () => openPath("@data"));
 $("#reload-log").addEventListener("click", loadLog);
-$("#btn-update").addEventListener("click", () => runJob("update"));
+$("#btn-update")?.addEventListener("click", () => runJob("update"));
 $("#ics-link").addEventListener("click", async e => {
   e.preventDefault();
   try {
@@ -1338,7 +1591,7 @@ function proposeFolder(path) {
   if (!path || !CONFIG || path === CONFIG.values.output_dir) { $("#move-box").hidden = true; return; }
   $("#f-out").value = path; $("#move-to").textContent = path; $("#move-box").hidden = false;
 }
-$("#pick-folder").addEventListener("click", async () => {
+$("#pick-folder")?.addEventListener("click", async () => {
   const b = $("#pick-folder"); b.disabled = true; b.textContent = "Atver logu…";
   try {
     const r = await post("/api/pick-folder", { initial: CONFIG ? CONFIG.values.output_dir : "" });
@@ -1346,9 +1599,9 @@ $("#pick-folder").addEventListener("click", async () => {
   } catch (e) { toast(e.message, true); }
   finally { b.disabled = false; b.textContent = "Izvēlēties…"; }
 });
-$("#f-out").addEventListener("change", e => proposeFolder(e.target.value));
-$("#f-out").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); proposeFolder(e.target.value); } });
-$("#move-cancel").addEventListener("click", () => { $("#f-out").value = CONFIG.values.output_dir; $("#move-box").hidden = true; });
+$("#f-out")?.addEventListener("change", e => proposeFolder(e.target.value));
+$("#f-out")?.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); proposeFolder(e.target.value); } });
+$("#move-cancel")?.addEventListener("click", () => { $("#f-out").value = CONFIG.values.output_dir; $("#move-box").hidden = true; });
 $$("#move-box [data-mode]").forEach(btn => btn.addEventListener("click", async () => {
   $$("#move-box button").forEach(x => x.disabled = true);
   try {
@@ -1358,8 +1611,8 @@ $$("#move-box [data-mode]").forEach(btn => btn.addEventListener("click", async (
   } catch (e) { toast(e.message, true); }
   finally { $$("#move-box button").forEach(x => x.disabled = false); }
 }));
-$("#open-out2").addEventListener("click", () => openPath(""));
-$("#pick-creds").addEventListener("click", async () => {
+$("#open-out2")?.addEventListener("click", () => openPath(""));
+$("#pick-creds")?.addEventListener("click", async () => {
   const b = $("#pick-creds"); b.disabled = true; b.textContent = "Atver logu…";
   try {
     const r = await post("/api/pick-credentials", {});
@@ -1367,7 +1620,7 @@ $("#pick-creds").addEventListener("click", async () => {
   } catch (e) { toast(e.message, true); }
   finally { b.disabled = false; b.textContent = "Izvēlēties failu…"; }
 });
-$("#detect-drive").addEventListener("click", async () => {
+$("#detect-drive")?.addEventListener("click", async () => {
   const box = $("#drive-suggest"); box.replaceChildren();
   const found = await api("/api/drive/detect");
   if (!found.length) { box.append(el("span", { class: "hint", text: "Neatradu. Instalē Google Drive for desktop vai ieraksti ceļu pats." })); return; }

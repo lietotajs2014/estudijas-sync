@@ -175,6 +175,8 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
             report["skipped"].append(f"{rel} ({item.size / 1048576:.0f} MB)")
         elif entry and entry.get("version") == item.version and not redownload:
             status = "downloaded"  # nav mainījies (arī ja lietotājs to apzināti izdzēsa — nelādējam no jauna)
+        elif not cfg.auto_download:
+            status = "available"   # tikai uzskaitīts; lejupielādē, kad lietotājs atzīmē
         if status:
             # ja agrāk lejupielādēts (piem., pēc izvēles), tas joprojām ir pieejams
             row["status"] = "downloaded" if entry and status != "downloaded" and entry.get("manual") else status
@@ -221,7 +223,8 @@ def _save_catalog(cfg: Config, files: list[FileItem], rows: list[dict]) -> None:
     os.replace(tmp, p)
 
 
-def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool = True) -> dict:
+def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool = True,
+                      auth: dict | None = None) -> dict:
     """Lejupielādē paneļa atzīmētos failus (arī tos, kas citādi tiktu izlaisti)."""
     import json
     prog = prog or NullProgress()

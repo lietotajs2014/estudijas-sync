@@ -50,6 +50,10 @@ class User(Base):
     last_sync: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # failu atslēgas, ko lietotājs atzīmēja lejupielādei (worker tās apstrādā un notīra)
+    download_requested: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # pārējie panelī maināmie iestatījumi (other_groups, only_categories, download_max_mb, ...)
+    prefs: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     moodle: Mapped["MoodleLink | None"] = relationship(back_populates="user", uselist=False,
                                                          cascade="all, delete-orphan")
@@ -123,6 +127,10 @@ def init_db() -> None:
 
 # Vienkāršas migrācijas: jaunas kolonnas esošām tabulām (create_all tās nepievieno).
 _NEW_COLUMNS = {
+    "users": {
+        "download_requested": "JSON",
+        "prefs": "JSON",
+    },
     "moodle_links": {
         "mode": "VARCHAR(10) DEFAULT 'api' NOT NULL",
         "cookies_enc": "TEXT",

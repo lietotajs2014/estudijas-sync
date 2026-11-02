@@ -84,7 +84,8 @@ def mirror(user, cfg) -> int:
     try:
         for entry in state.files.values():
             rel = entry.get("path")
-            if not rel or (cats and file_category(rel).casefold() not in cats):
+            # pašu atzīmētie (web lapā "Ielādēt atzīmētos") — vienmēr; pārējie pēc kategorijām
+            if not rel or (cats and not entry.get("manual") and file_category(rel).casefold() not in cats):
                 continue
             src: Path = cfg.output_dir / rel
             if not src.is_file():

@@ -1,7 +1,7 @@
 """Web lapa: uvicorn server.app:app
 
-Plūsma: Google pieteikšanās (allowlist) → e-studiju žetons → programmas/grupas apstiprināšana →
-panelis (termiņi, ICS saite Google Calendar, Drive, "Sinhronizēt tagad").
+Plūsma: Google pieteikšanās (allowlist) → panelis (tas pats, kas localhost, sk. panel.py) →
+"Pieteikties" ar RTU kontu tieši lapā (ms_login.py) vai savienošanas kods no Android/PC → sinhronizācija serverī.
 """
 from __future__ import annotations
 
@@ -24,6 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import google_oauth
 from .crypto import encrypt
 from .db import GoogleLink, MoodleLink, PairingCode, User, get_db, init_db, utcnow
+from .panel import panel_page, router as panel_router
 from .moodle_link import LinkError, inspect_account, inspect_session, normalize_cookies, parse_token_input
 from .runner import ics_path, load_view, user_dir
 from .settings import settings
@@ -47,6 +48,7 @@ app.add_middleware(SessionMiddleware, secret_key=settings.secret_key or secrets.
                    session_cookie="es_session", max_age=30 * 24 * 3600, same_site="lax",
                    https_only=settings.secure_cookies)
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+app.include_router(panel_router)
 
 
 @app.middleware("http")
@@ -149,11 +151,7 @@ def healthz() -> str:
 def index(request: Request, user: User | None = Depends(current_user)):
     if not user:
         return render(request, "index.html", missing=settings.check(), flash=pop_flash(request))
-    if not user.moodle:
-        return RedirectResponse("/connect", 303)
-    if not user.program and user.moodle.detected and not request.session.get("confirmed"):
-        return RedirectResponse("/confirm", 303)
-    return render(request, "dashboard.html", user, flash=pop_flash(request), **dashboard_data(user))
+    return panel_page(request, csrf_token(request))
 
 
 @app.get("/privacy", response_class=HTMLResponse)
@@ -245,6 +243,10 @@ def _save_link(db: Session, user: User, info: dict, *, mode: str, source: str, t
     link.cookies_enc = encrypt(json.dumps(cookies)) if cookies else None
     link.moodle_userid, link.fullname, link.detected = info["userid"], info["fullname"] or link.fullname or "", detected
     link.valid, link.linked = True, utcnow()
+    if not user.program and info.get("program"):   # atpazītais — lietotājs var izlabot iestatījumos
+        user.program = info["program"]
+    if not user.group and info.get("group"):
+        user.group = info["group"]
     if not user.moodle:
         db.add(link)
     user.last_error = None
@@ -369,10 +371,10 @@ def sync_now(request: Request, _=Depends(check_csrf), user: User = Depends(requi
     return RedirectResponse("/", 303)
 
 
-@app.get("/settings", response_class=HTMLResponse)
+@app.get("/settings")
 def settings_page(request: Request, user: User = Depends(require_user)):
-    return render(request, "settings.html", user, flash=pop_flash(request),
-                  ics_url=f"{settings.base_url}/cal/{user.ics_secret}.ics")
+    request.session["tab"] = "iestatijumi"
+    return RedirectResponse("/", 303)
 
 
 @app.post("/settings")
@@ -414,7 +416,7 @@ def moodle_disconnect(request: Request, _=Depends(check_csrf), user: User = Depe
         db.delete(user.moodle)
         db.commit()
     flash(request, "E-studijas atvienotas, sesija no servera izdzēsta.")
-    return RedirectResponse("/connect", 303)
+    return RedirectResponse("/settings", 303)
 
 
 @app.post("/settings/ics/reset")

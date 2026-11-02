@@ -24,7 +24,7 @@ document.addEventListener("click", (e) => {
       const j = await r.json();
       if (j.linked) {
         wait.textContent = "Savienots ✓";
-        location.href = "/confirm";
+        location.href = "/";
         return;
       }
     } catch (e) { /* tīkla kļūme — mēģinām vēlreiz */ }
