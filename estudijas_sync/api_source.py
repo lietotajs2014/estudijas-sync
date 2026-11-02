@@ -125,7 +125,7 @@ class ApiSource:
                             modtype=mod, filename=f.get("filename", "fails"), url=f["fileurl"],
                             version=str(f.get("timemodified") or f.get("fileurl")), cmid=m.get("id", 0),
                             subpath=(f.get("filepath") or "/").strip("/") if mod == "folder" else "",
-                            size=f.get("filesize"), page_url=murl))
+                            size=f.get("filesize"), page_url=murl, modified=f.get("timemodified")))
                     if desc:
                         res.texts.append(TextBlock(c.id, f"{secname} — {mname}", desc, murl, "sadaļa"))
                 elif mod == "page":
@@ -179,13 +179,13 @@ class ApiSource:
                         course_id=cid, section=sec or "Uzdevumi", section_num=0, module=name, modtype="assign",
                         filename=att.get("filename", "pielikums"), url=att["fileurl"],
                         version=str(att.get("timemodified") or att["fileurl"]), cmid=a["cmid"],
-                        size=att.get("filesize"), page_url=url, kind_hint=kind))
+                        size=att.get("filesize"), page_url=url, kind_hint=kind, modified=att.get("timemodified")))
                 if not due:
                     continue
                 status = None
                 if now - 21 * 86400 < due < now + self.cfg.lookahead_days * 86400:
                     status = self._assign_status(a["id"])
-                details = intro[:1500]
+                details = intro[:5000]
                 if a.get("cutoffdate"):
                     details = f"Galīgais termiņš: {self._fmt(a['cutoffdate'])}\n{details}"
                 res.add_deadline(Deadline(
@@ -223,7 +223,7 @@ class ApiSource:
             att = q.get("attempts")
             if att is not None:
                 details.append("Mēģinājumi: " + ("neierobežoti" if int(att) == 0 else str(att)))
-            details.append(html_to_text(q.get("intro"))[:800])
+            details.append(html_to_text(q.get("intro"))[:3000])
             status = None
             try:
                 at = self.api.call("mod_quiz_get_user_attempts", quizid=q["id"], status="finished")
@@ -260,7 +260,7 @@ class ApiSource:
                 kind=classify_kind(f"{name} {desc}", "Notikums"), title=name,
                 due=start + timedelta(seconds=dur) if dur else start, start=start if dur else None,
                 url=e.get("url") or f"{self.site}/calendar/view.php?view=day&time={e.get('timestart')}",
-                details=desc[:800]))
+                details=desc[:3000]))
 
     def _forums(self, ids: list[int], res: CollectResult) -> None:
         forums = self.api.call("mod_forum_get_forums_by_courses", courseids=ids)

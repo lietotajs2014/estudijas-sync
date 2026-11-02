@@ -45,13 +45,26 @@ FIELDS: dict[str, tuple[str | None, str, str]] = {
     "ics": ("calendar", "ics", "bool"),
     "google": ("calendar", "google", "bool"),
     "google_calendar_name": ("calendar", "google_calendar_name", "str"),
+    "google_credentials": ("calendar", "google_credentials", "creds"),
     "include_text_dates": ("calendar", "include_text_dates", "bool"),
     "reminders_minutes": ("calendar", "reminders_minutes", "intlist"),
     "drive_enabled": ("drive", "enabled", "bool"),
     "drive_folder": ("drive", "folder", "str"),
+    "drive_link": ("drive", "link", "url"),
     "drive_categories": ("drive", "categories", "list"),
     "drive_include_digest": ("drive", "include_digest", "bool"),
 }
+
+
+def check_credentials_file(p: Path) -> None:
+    if not p.is_file():
+        raise ValueError(f"Fails nav atrasts: {p}")
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError(f"Nevar nolasīt JSON: {e}") from e
+    if not ("installed" in data or "web" in data):
+        raise ValueError("Tas neizskatās pēc Google OAuth klienta faila (vajag 'Desktop app' tipa client_secret JSON).")
 
 
 def _coerce(kind: str, v):
@@ -61,6 +74,16 @@ def _coerce(kind: str, v):
         return int(v)
     if kind == "float":
         return float(v)
+    if kind == "creds":
+        v = str(v).strip().strip('"')
+        if v:
+            check_credentials_file(Path(os.path.expandvars(os.path.expanduser(v))))
+        return v.replace("\\", "/")
+    if kind == "url":
+        v = str(v).strip()
+        if v and not re.match(r"^https://(drive|docs)\.google\.com/", v):
+            raise ValueError("Drive saitei jāsākas ar https://drive.google.com/")
+        return v
     if kind == "upper":
         return str(v).strip().upper()
     if kind == "group":
@@ -181,6 +204,32 @@ class App:
         set_toml_values(cfg.config_path, {("calendar", "google"): True})
         return f"Google Calendar savienots (kalendārs '{cfg.google_calendar_name}', {cid})."
 
+    def job_download(self, keys: list[str]) -> str:
+        from .sync import download_selected
+        r = download_selected(self.cfg(), keys, prog=self.prog)
+        msg = f"Lejupielādēti {len(r['done'])} faili."
+        if r["errors"]:
+            msg += f" Neizdevās {len(r['errors'])}: " + "; ".join(r["errors"][:5])
+        return msg
+
+    def reveal(self, rel: str) -> str:
+        """Parāda failu mapē (Explorer ar iezīmētu failu)."""
+        cfg = self.cfg()
+        base = cfg.output_dir.resolve()
+        target = (base / rel).resolve()
+        if base not in target.parents:
+            raise PermissionError("Ceļš ārpus izvades mapes")
+        if not target.exists():
+            raise FileNotFoundError(f"Fails nav atrasts: {target}")
+        system = platform.system()
+        if system == "Windows":
+            subprocess.Popen(["explorer", "/select,", str(target)])
+        elif system == "Darwin":
+            subprocess.Popen(["open", "-R", str(target)])
+        else:
+            subprocess.Popen(["xdg-open", str(target.parent)])
+        return str(target)
+
     def job_update(self) -> str:
         from .updater import do_update
         ok, msg = do_update()
@@ -215,9 +264,11 @@ class App:
             "only_categories": cfg.only_categories, "notify": cfg.notify, "lookahead_days": cfg.lookahead_days,
             "download_max_mb": cfg.download_max_mb, "schedule_times": cfg.schedule_times, "ics": cfg.ics,
             "google": cfg.google, "google_calendar_name": cfg.google_calendar_name,
+            "google_credentials": str(cfg.google_credentials),
             "include_text_dates": cfg.include_text_dates, "reminders_minutes": cfg.reminders_minutes,
             "drive_enabled": cfg.drive_enabled, "drive_folder": str(cfg.drive_folder or ""),
             "drive_categories": cfg.drive_categories, "drive_include_digest": cfg.drive_include_digest,
+            "drive_link": cfg.drive_link,
         }
         cats = list(cfg.categories) + ["Lekcijas", "Uzdevumi", "Citi"]
         return {"values": vals, "categories": list(dict.fromkeys(cats))}
@@ -245,14 +296,29 @@ class App:
         except (OSError, json.JSONDecodeError):
             return {}
 
-    def recent_files(self) -> list[dict]:
+    def files(self) -> dict:
+        """Visi estudiju faili (katalogs no pēdējās sinhronizācijas) + vai tie ir mapē."""
         from .drive import file_category
-        st = State(self.cfg().data_dir / "state.json")
-        rows = [{"path": e.get("path", ""), "downloaded": e.get("downloaded", ""),
-                 "category": file_category(e.get("path", "")), "course": e.get("path", "").split("/")[0]}
-                for e in st.files.values() if e.get("path")]
-        rows.sort(key=lambda r: r["downloaded"], reverse=True)
-        return rows[:300]
+        cfg = self.cfg()
+        out = cfg.output_dir
+        rows = self.view().get("files")
+        if rows is None:  # vecāka versija: tikai lejupielādētie
+            st = State(cfg.data_dir / "state.json")
+            rows = [{"key": k, "path": e.get("path", ""), "planned": e.get("path", ""), "downloaded_at": e.get("downloaded"),
+                     "category": file_category(e.get("path", "")), "course": e.get("path", "").split("/")[0],
+                     "course_full": e.get("path", "").split("/")[0], "filename": e.get("path", "").split("/")[-1],
+                     "status": "downloaded", "module": "", "section": "", "course_id": 0, "cmid": "",
+                     "size": None, "modified": None, "first_seen": e.get("downloaded")}
+                    for k, e in st.files.items() if e.get("path")]
+        st = State(cfg.data_dir / "state.json").files
+        for r in rows:
+            e = st.get(r["key"])
+            if e and e.get("path"):
+                r["path"] = e["path"]
+                if r.get("status") not in ("downloaded",) and e.get("manual"):
+                    r["status"] = "downloaded"
+            r["exists"] = bool(r.get("path")) and (out / r["path"]).exists() and r.get("status") == "downloaded"
+        return {"output_dir": str(out), "exists": out.exists(), "files": rows}
 
     def doc(self, name: str) -> str:
         cfg = self.cfg()
@@ -365,7 +431,7 @@ def make_handler(app: App):
                 if u.path == "/api/config":
                     return self._json(app.config_dict())
                 if u.path == "/api/files":
-                    return self._json(app.recent_files())
+                    return self._json(app.files())
                 if u.path == "/api/doc":
                     return self._json({"text": app.doc(q.get("name", [""])[0])})
                 if u.path == "/api/log":
@@ -400,6 +466,14 @@ def make_handler(app: App):
                     return self._json({"ok": ok, "message": msg}, 200 if ok else 409)
                 if u.path == "/api/config":
                     return self._json(app.save_config(body))
+                if u.path == "/api/download":
+                    keys = [str(k) for k in body.get("keys", [])][:2000]
+                    if not keys:
+                        return self._json({"ok": False, "error": "Nav atzīmēts neviens fails"}, 400)
+                    ok, msg = app.start_job("Lejupielāde", lambda: app.job_download(keys))
+                    return self._json({"ok": ok, "message": msg}, 200 if ok else 409)
+                if u.path == "/api/reveal":
+                    return self._json({"ok": True, "path": app.reveal(str(body.get("path", "")))})
                 if u.path == "/api/schedule":
                     from . import schedule
                     cfg = app.cfg()
@@ -410,6 +484,15 @@ def make_handler(app: App):
                 if u.path == "/api/pick-folder":
                     from .relocate import pick_folder
                     return self._json({"ok": True, "path": pick_folder(str(body.get("initial") or ""))})
+                if u.path == "/api/pick-credentials":
+                    from .relocate import pick_file
+                    cfg = app.cfg()
+                    path = pick_file(str(cfg.google_credentials))
+                    if not path:
+                        return self._json({"ok": True, "path": None})
+                    check_credentials_file(Path(path))
+                    set_toml_values(cfg.config_path, {("calendar", "google_credentials"): path.replace("\\", "/")})
+                    return self._json({"ok": True, "path": path})
                 if u.path == "/api/change-folder":
                     if app.job:
                         return self._json({"ok": False, "error": f"Pagaidi, kamēr beigsies: {app.job['name']}"}, 409)

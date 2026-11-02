@@ -64,10 +64,11 @@ google_credentials = "~/.estudijas_sync/credentials.json"
 google_calendar_name = "RTU estudijas"
 
 [drive]
-# Kopēt izvēlētās kategorijas uz Google Drive / OneDrive mapi datorā (Drive for desktop to augšupielādē pats)
-# — tad, piem., mājas darbi ir redzami telefona Drive lietotnē bez Termux.
+# Kopēt izvēlētās kategorijas uz Google Drive mapi datorā (Google Drive for desktop to augšupielādē pats)
+# — tad, piem., mājas darbi ir redzami telefona Drive lietotnē.
 enabled = false
-folder = ""                      # piem. "G:/My Drive/RTU" vai "~/OneDrive - Rigas Tehniska universitate/RTU"
+folder = ""                      # piem. "G:/My Drive/RTU estudijas"
+link = ""                        # tās pašas mapes saite drive.google.com (Share → Copy link) — rāda panelī un UZDEVUMI.md
 categories = ["Mājas darbi"]     # tukšs = viss
 include_digest = true            # kopēt arī UZDEVUMI.md, JAUNUMI.md, termini.ics
 

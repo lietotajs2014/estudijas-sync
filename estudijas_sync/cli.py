@@ -96,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--no-login-window", action="store_true",
                     help="neatvērt pārlūka logu, ja vajag pieteikties (tikai brīdināt)")
     sub.add_parser("status", help="parādīt stāvokli un tuvākos termiņus")
-    sub.add_parser("gcal-auth", help="autorizēt Google Calendar")
+    gp = sub.add_parser("gcal-auth", help="autorizēt Google Calendar")
+    gp.add_argument("--credentials", help="ceļš uz Google OAuth credentials.json (ja nav norādīts — iestatījumos esošais)")
     sub.add_parser("install-schedule", help="palaist automātiski (laiki no konfigurācijas)")
     sub.add_parser("uninstall-schedule", help="noņemt automātisko palaišanu")
     sub.add_parser("update", help="atjaunināt skriptu uz jaunāko versiju (git pull)")
@@ -218,6 +219,17 @@ def main(argv: list[str] | None = None) -> int:
         from . import gcal
         from .config import State
         st = State(cfg.data_dir / "state.json")
+        if args.credentials:
+            from .config import set_toml_values
+            from .webui import check_credentials_file
+            p = Path(args.credentials).expanduser()
+            try:
+                check_credentials_file(p)
+            except ValueError as e:
+                print(f"✖ {e}")
+                return 1
+            set_toml_values(cfg.config_path, {("calendar", "google_credentials"): str(p.resolve()).replace("\\", "/")})
+            cfg = load_config(cfg.profile, cfg.config_path)
         svc = gcal.get_service(cfg, interactive=True)
         cid = gcal.ensure_calendar(svc, cfg, st)
         st.save()

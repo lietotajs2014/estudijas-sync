@@ -1,9 +1,8 @@
-"""Kopēšana uz Google Drive / OneDrive sinhronizēto mapi (bez API — to augšupielādē Drive for desktop)."""
+"""Kopēšana uz Google Drive sinhronizēto mapi (bez API — to augšupielādē Google Drive for desktop)."""
 from __future__ import annotations
 
 import glob
 import logging
-import os
 import platform
 import shutil
 import string
@@ -60,7 +59,7 @@ def mirror(cfg: Config, state: State) -> list[str]:
 
 
 def detect_folders() -> list[dict]:
-    """Atrod Google Drive / OneDrive mapes šajā datorā (ieteikumi iestatījumos)."""
+    """Atrod Google Drive for desktop mapes šajā datorā (ieteikumi iestatījumos)."""
     found: list[dict] = []
     home = Path.home()
 
@@ -72,16 +71,9 @@ def detect_folders() -> list[dict]:
         for letter in string.ascii_uppercase[3:]:
             for name in ("My Drive", "Mans disks", "Мой диск"):
                 add("Google Drive", Path(f"{letter}:/{name}"))
-        for var in ("OneDriveCommercial", "OneDrive", "OneDriveConsumer"):
-            if os.environ.get(var):
-                add("OneDrive", Path(os.environ[var]))
     for p in glob.glob(str(home / "Library/CloudStorage/GoogleDrive-*")):
         for name in ("My Drive", "Mans disks"):
             add("Google Drive", Path(p) / name)
-    for p in glob.glob(str(home / "Library/CloudStorage/OneDrive*")):
-        add("OneDrive", Path(p))
     for p in (home / "Google Drive" / "My Drive", home / "Google Drive", home / "My Drive"):
         add("Google Drive", p)
-    for p in glob.glob(str(home / "OneDrive*")):
-        add("OneDrive", Path(p))
     return found

@@ -9,22 +9,37 @@ Parole nekur netiek glabāta. Tu vienreiz piesakies ar RTU e-pastu (Microsoft, a
 Visu var darīt pārlūkā: Windows dubultklikšķis uz **`start.bat`** (macOS: `start.command`) vai `python run.py web`. Atveras `http://127.0.0.1:8765`.
 
 Panelī ir:
-- **Termiņi** — divu nedēļu laika ass un saraksts: nokavēts, šodien/rīt, šonedēļ, šomēnes. Filtri: KD, MD, testi, LD/PD. Ir iesniegšanas statuss, apraksti, datumi no paziņojumiem un saliktā sadaļā arī citām grupām paslēptais.
+- **Termiņi** — divu nedēļu laika ass un saraksts ar nākotnes termiņiem: šodien/rīt, šonedēļ, šomēnes, vēlāk.
+  - Pagājušie termiņi parādās tikai pēc pogas **"Rādīt pagājušos"**. Ja tur ir neiesniegts uzdevums, poga ir sarkana.
+  - Uzklikšķinot uz termiņa (laika asī vai sarakstā), atveras logs ar pilno aprakstu, termiņu, statusu, sadaļu, saistītajiem failiem un pogām **"Atvērt estudijās"** un **"Atvērt kursu"**.
+  - Filtri: KD, MD, testi, LD/PD, meklēšana. Citām grupām paslēptais ir saliktā sadaļā.
 - **Sinhronizēt tagad** ar progresa joslu un pēdējās sinhronizācijas laiku.
 - **Jaunumi** — kas mainījies pēdējā reizē un visa vēsture.
-- **Faili** — lejupielādētie faili pa kategorijām, poga "Atvērt" un "Atvērt mapi".
+- **Faili** — visi kursu faili estudijās, ne tikai lejupielādētie.
+  - Augšā redzams pilns ceļš uz mapi, kurā faili tiek saglabāti, un pogas "Atvērt mapi", "Mainīt mapi" un "Atvērt Google Drive".
+  - Filtri: kurss, tips (lekcijas, MD, KD …), termiņš (faili, kas pieder konkrētam uzdevumam), statuss (ir mapē / nav mapē / nav lejupielādēti / citām grupām), meklēšana.
+  - Kārtošana: jaunākie, pa kursiem, pēc nosaukuma, pēc izmēra.
+  - **Vairāku failu izvēle**: atzīmē rūtiņas vai "Atzīmēt redzamos" un spied **"Lejupielādēt atzīmētos"**. Tā var lejupielādēt arī failus, kas pēc iestatījumiem tiktu izlaisti.
+  - Katram failam ir pogas "Atvērt" un "Parādīt mapē", kas atver Explorer ar iezīmētu failu.
 - **Iestatījumi**:
   - e-pasts, programma, grupa;
-  - izvades mape un lejupielādējamās kategorijas;
-  - Google Drive/OneDrive kopēšana ar mapes automātisku atrašanu;
-  - Google Calendar savienošana (augšupielādē `credentials.json` un spied "Savienot") un `.ics`;
-  - automātiskās palaišanas laiki ar ieslēgšanu/izslēgšanu un paziņojumi.
+  - izvades mape ar izvēles logu un lejupielādējamās kategorijas;
+  - Google Drive kopēšana un saite uz Drive mapi;
+  - Google Calendar: `credentials.json` atrašanās vietu izvēlies ar **"Izvēlēties failu…"** (vai augšupielādē failu), tad spied "Savienot ar Google";
+  - `.ics`, automātiskās palaišanas laiki un paziņojumi.
 - **Konts** — pieteikties, pieteikties no jauna vai aizmirst piekļuvi.
 - **Instrukcija** (šis fails) un **Žurnāls**.
 
 Panelis darbojas tikai tavā datorā (`127.0.0.1`), un citi tīkla dalībnieki tam nevar piekļūt. **Paroles lauka nav, un tas ir apzināti**: Microsoft pieteikšanās ar MFA notiek atvērtā logā, un e-pasts tiek aizpildīts automātiski. Automātiskās sinhronizācijas strādā arī tad, ja panelis ir aizvērts.
 
-**Google Drive:** ja datorā ir Google Drive for desktop, iestatījumos ieslēdz "Kopēt uz Drive" un izvēlies mapi, piemēram, `G:/My Drive/RTU estudijas`. Izvēlētās kategorijas (pēc noklusējuma mājas darbi) un `UZDEVUMI.md` parādīsies telefona Drive lietotnē. Termux tam nav vajadzīgs.
+**Google Drive:**
+1. Datorā jābūt Google Drive for desktop.
+2. Iestatījumos ieslēdz "Kopēt uz Drive" un izvēlies mapi, piemēram, `G:/My Drive/RTU estudijas`. Poga "Atrast Drive mapi" to atrod pati.
+3. Iekopē tās pašas mapes saiti: drive.google.com → mapei *Share* → *Copy link*. Panelī parādīsies poga "Atvērt Google Drive", un saite būs arī `UZDEVUMI.md` augšā.
+
+Mapi koplietot ar "Anyone with the link" vari pats, bet atceries, ka lekciju materiāli ir pasniedzēju darbs.
+
+**Kur ir faili?** Panelis cilnē *Faili* augšā rāda precīzu ceļu. Uz Windows mape "Dokumenti" bieži ir pārvirzīta uz OneDrive (`C:\Users\<tu>\OneDrive\Documents`). Jaunās instalācijās skripts lieto īsto "Dokumenti" mapi. Ja faili jau ir vecajā vietā, tie tur paliek; tos var pārvietot ar "Mainīt mapi".
 
 ## Kas notiek katrā palaišanā
 
@@ -130,8 +145,9 @@ Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skri
 4. Uzstādi:
    ```bash
    pip install -r requirements-google.txt
-   python run.py gcal-auth
+   python run.py gcal-auth --credentials "C:/ceļš/uz/client_secret.json"
    ```
+   Panelī to pašu dara poga "Izvēlēties failu…".
    Konfigurācijā ieliec `[calendar] google = true`.
 
 Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Atgādinājumi tiek iestatīti 1 dienu un 2 h pirms termiņa (`reminders_minutes`).

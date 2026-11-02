@@ -86,28 +86,28 @@ def plan_path(cfg: Config, item: FileItem, course_dir: Path, cats) -> tuple[str,
 
 def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, Path], state: State,
                redownload: bool = False, matchers: dict[int, Matcher] | None = None, prog=None) -> dict:
+    """Lejupielādē jaunos/mainītos failus un atgriež arī pilnu katalogu (visi estudiju faili ar statusu)."""
     prog = prog or NullProgress()
     cats = compile_categories(cfg.categories)
-    report = {"new": [], "updated": [], "skipped": [], "errors": [], "other": []}
+    report = {"new": [], "updated": [], "skipped": [], "errors": [], "other": [], "catalog": []}
     matchers = matchers or {}
     used: dict[Path, str] = {}
     max_bytes = cfg.download_max_mb * 1024 * 1024
     out = cfg.output_dir
     only = {c.casefold() for c in cfg.only_categories}
-    todo: list[tuple[FileItem, Path, str, dict | None]] = []
+    first_seen: dict = state.data.setdefault("first_seen", {})
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    todo: list[tuple[FileItem, Path, str, dict | None, dict]] = []
     for item in files:
         cdir = course_dirs.get(item.course_id)
         if cdir is None:
             continue
         cat, path = plan_path(cfg, item, cdir, cats)
-        if only and cat.casefold() not in only:
-            continue
+        status = None
         m = matchers.get(item.course_id)
-        if m and cfg.other_groups != "keep" and \
-                m.first(f"{item.filename} {item.module}", item.subpath, item.section) == OTHER:
-            if cfg.other_groups == "skip":
-                report["other"].append(f"{item.filename} — {item.section} / {item.module}")
-                continue
+        is_other = bool(m and cfg.other_groups != "keep" and
+                        m.first(f"{item.filename} {item.module}", item.subpath, item.section) == OTHER)
+        if is_other and cfg.other_groups in ("skip", "folder"):
             path = cdir / "_Citām grupām" / path.relative_to(cdir)
         if path in used and used[path] != item.key:
             path = path.with_name(f"{path.stem} ({item.cmid}){path.suffix}")
@@ -115,39 +115,112 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
             continue  # tas pats fails divreiz sarakstā
         used[path] = item.key
         rel = path.relative_to(out).as_posix()
-        if os.path.splitext(item.filename)[1].lower() in cfg.skip_extensions:
-            report["skipped"].append(f"{rel} (paplašinājums)")
-            continue
-        if item.size and item.size > max_bytes:
-            report["skipped"].append(f"{rel} ({item.size / 1048576:.0f} MB)")
-            continue
+        first_seen.setdefault(item.key, now_iso)
         entry = state.files.get(item.key)
-        if entry and entry.get("version") == item.version and not redownload:
-            continue  # nav mainījies (arī ja lietotājs to apzināti izdzēsa — nelādējam no jauna)
-        todo.append((item, path, rel, entry))
-
-    if not todo:
-        return report
-    prog.start("Lejupielādē", len(todo), sum(i.size or 0 for i, *_ in todo))
-    for item, path, rel, entry in todo:
-        prog.label(item.filename)
-        try:
-            src.download(item, path, on_bytes=prog.add_bytes)
-        except LoginRequired:
-            raise
-        except Exception as e:
-            log.warning("Lejupielāde neizdevās %s: %s", rel, e)
-            report["errors"].append(f"Neizdevās lejupielādēt {rel}: {e}")
-            prog.advance(item.filename)
+        row = {"key": item.key, "course_id": item.course_id, "category": cat, "filename": item.filename,
+               "module": item.module, "section": item.section, "modtype": item.modtype, "cmid": str(item.cmid),
+               "size": item.size, "modified": item.modified, "first_seen": first_seen[item.key],
+               "path": (entry or {}).get("path") or rel, "planned": rel, "other_group": is_other,
+               "downloaded_at": (entry or {}).get("downloaded")}
+        report["catalog"].append(row)
+        if only and cat.casefold() not in only:
+            status = "unselected"
+        elif is_other and cfg.other_groups == "skip":
+            status = "other"
+            report["other"].append(f"{item.filename} — {item.section} / {item.module}")
+        elif os.path.splitext(item.filename)[1].lower() in cfg.skip_extensions:
+            status = "ext"
+            report["skipped"].append(f"{rel} (paplašinājums)")
+        elif item.size and item.size > max_bytes:
+            status = "big"
+            report["skipped"].append(f"{rel} ({item.size / 1048576:.0f} MB)")
+        elif entry and entry.get("version") == item.version and not redownload:
+            status = "downloaded"  # nav mainījies (arī ja lietotājs to apzināti izdzēsa — nelādējam no jauna)
+        if status:
+            # ja agrāk lejupielādēts (piem., pēc izvēles), tas joprojām ir pieejams
+            row["status"] = "downloaded" if entry and status != "downloaded" and entry.get("manual") else status
             continue
-        state.files[item.key] = {"version": item.version, "path": rel,
-                                 "downloaded": datetime.now().isoformat(timespec="seconds")}
-        report["updated" if entry else "new"].append(rel)
-        log.info("%s: %s", "atjaunināts" if entry else "jauns", rel)
-        prog.advance(item.filename)
-    prog.finish(f"{len(report['new'])} jauni, {len(report['updated'])} atjaunināti"
-                + (f", {len(report['errors'])} kļūdas" if report["errors"] else ""))
+        row["status"] = "pending"
+        todo.append((item, path, rel, entry, row))
+
+    if todo:
+        prog.start("Lejupielādē", len(todo), sum(i.size or 0 for i, *_ in todo))
+        for item, path, rel, entry, row in todo:
+            prog.label(item.filename)
+            try:
+                src.download(item, path, on_bytes=prog.add_bytes)
+            except LoginRequired:
+                raise
+            except Exception as e:
+                log.warning("Lejupielāde neizdevās %s: %s", rel, e)
+                report["errors"].append(f"Neizdevās lejupielādēt {rel}: {e}")
+                row["status"] = "error"
+                prog.advance(item.filename)
+                continue
+            state.files[item.key] = {"version": item.version, "path": rel, "downloaded": now_iso}
+            row.update(status="downloaded", path=rel, downloaded_at=now_iso)
+            report["updated" if entry else "new"].append(rel)
+            log.info("%s: %s", "atjaunināts" if entry else "jauns", rel)
+            prog.advance(item.filename)
+        prog.finish(f"{len(report['new'])} jauni, {len(report['updated'])} atjaunināti"
+                    + (f", {len(report['errors'])} kļūdas" if report["errors"] else ""))
+    _save_catalog(cfg, files, report["catalog"])
     return report
+
+
+def _save_catalog(cfg: Config, files: list[FileItem], rows: list[dict]) -> None:
+    """Pilnie failu dati (ar URL) lejupielādei pēc pieprasījuma no paneļa."""
+    import json
+    from dataclasses import asdict
+    by_key = {f.key: f for f in files}
+    data = {r["key"]: {"item": asdict(by_key[r["key"]]), "planned": r["planned"]} for r in rows if r["key"] in by_key}
+    p = cfg.data_dir / "catalog.json"
+    tmp = p.with_name("catalog.json.tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool = True) -> dict:
+    """Lejupielādē paneļa atzīmētos failus (arī tos, kas citādi tiktu izlaisti)."""
+    import json
+    prog = prog or NullProgress()
+    try:
+        catalog = json.loads((cfg.data_dir / "catalog.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        raise RuntimeError("Failu saraksts vēl nav izveidots — vispirms sinhronizē.")
+    picked = [(FileItem(**catalog[k]["item"]), catalog[k]["planned"]) for k in keys if k in catalog]
+    if not picked:
+        raise ValueError("Neviens no atzīmētajiem failiem vairs nav atrodams estudijās — sinhronizē no jauna.")
+    state = State(cfg.data_dir / "state.json")
+    done, errors = [], []
+    now_iso = datetime.now().isoformat(timespec="seconds")
+    with run_lock(cfg), make_source(cfg, interactive, prog) as src:
+        prog.start("Lejupielādē atzīmētos", len(picked), sum(i.size or 0 for i, _ in picked))
+        for item, rel in picked:
+            prog.label(item.filename)
+            try:
+                src.download(item, cfg.output_dir / rel, on_bytes=prog.add_bytes)
+                state.files[item.key] = {"version": item.version, "path": rel, "downloaded": now_iso, "manual": True}
+                done.append(rel)
+            except LoginRequired:
+                raise
+            except Exception as e:
+                errors.append(f"{item.filename}: {e}")
+            prog.advance(item.filename)
+        prog.finish(f"{len(done)} lejupielādēti" + (f", {len(errors)} kļūdas" if errors else ""))
+    state.save()
+    # atjauno statusu panelī bez pilnas sinhronizācijas
+    vp = cfg.data_dir / "view.json"
+    try:
+        view = json.loads(vp.read_text(encoding="utf-8"))
+        idx = {r["key"]: r for r in view.get("files", [])}
+        for item, rel in picked:
+            if item.key in state.files and item.key in idx:
+                idx[item.key].update(status="downloaded", path=rel, downloaded_at=now_iso)
+        vp.write_text(json.dumps(view, ensure_ascii=False, indent=1), encoding="utf-8")
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {"done": done, "errors": errors}
 
 
 def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None,
@@ -217,7 +290,8 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     changes_md = chg.render_md(ch, by_id)
     chg.append_changelog(out, ch, changes_md)
     write_digest(out, now, info.get("fullname", ""), by_id, moodle, text_dl, report, warnings, names,
-                 changes_md, ch.previous_run, others, describe_filter(cfg, matchers))
+                 changes_md, ch.previous_run, others, describe_filter(cfg, matchers),
+                 cfg.drive_link if cfg.drive_enabled else "")
     if cfg.notify:
         note = chg.notification(ch, by_id)
         if note:
@@ -265,11 +339,11 @@ def sync_with_relogin(cfg: Config, redownload: bool = False, no_calendar: bool =
 
 def _dl_json(d, by_id: dict) -> dict:
     c = by_id.get(d.course_id)
-    return {"uid": d.uid, "kind": d.kind, "title": d.title, "course": c.label if c else "",
+    return {"uid": d.uid, "kind": d.kind, "title": d.title, "course": c.label if c else "", "course_id": d.course_id,
             "course_full": c.fullname if c else "", "due": d.due.isoformat(),
             "start": d.start.isoformat() if d.start else None, "url": d.url, "status": d.status,
             "done": d.done, "source": d.source, "relevance": d.relevance, "section": d.section,
-            "details": (d.details or "")[:700]}
+            "details": (d.details or "")[:5000]}
 
 
 def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, text_dl, others, ch, changes_md,
@@ -291,6 +365,9 @@ def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, t
         "report": {k: report.get(k, []) for k in ("new", "updated", "skipped", "errors", "other")},
         "warnings": warnings,
         "drive_copied": drive_copied,
+        "files": [dict(r, course=by_id[r["course_id"]].label if r["course_id"] in by_id else "",
+                       course_full=by_id[r["course_id"]].fullname if r["course_id"] in by_id else "")
+                  for r in report.get("catalog", [])],
         "gcal_changes": gcal_changes,
     }
     p = cfg.data_dir / "view.json"

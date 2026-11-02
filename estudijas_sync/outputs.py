@@ -47,10 +47,12 @@ def write_digest(out: Path, now: datetime, user: str, courses: dict[int, Course]
                  deadlines: list[Deadline], text_deadlines: list[Deadline], files_report: dict,
                  warnings: list[str], course_dirs: dict[int, str],
                  changes_md: list[str] | None = None, previous_run: str | None = None,
-                 others: list[Deadline] | None = None, filter_desc: str = "") -> Path:
+                 others: list[Deadline] | None = None, filter_desc: str = "", drive_link: str = "") -> Path:
     L: list[str] = ["# RTU estudijas — kas jādara", "",
                     f"Atjaunināts: {now:%d.%m.%Y %H:%M}" + (f" · {user}" if user else "")
                     + (f" · atlase: **{filter_desc}**" if filter_desc else ""), ""]
+    if drive_link:
+        L += [f"📁 Faili Google Drive: {drive_link}", ""]
 
     def table(rows: list[Deadline]) -> None:
         L.append("| Termiņš | Kad | Kurss | Veids | Uzdevums | Statuss |")

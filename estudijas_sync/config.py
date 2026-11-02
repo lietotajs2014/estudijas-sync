@@ -12,6 +12,39 @@ APP_HOME = Path(os.environ.get("ESTUDIJAS_SYNC_HOME", Path.home() / ".estudijas_
 TEMPLATE = Path(__file__).with_name("config_template.toml")
 
 
+LEGACY_DEFAULT = "~/Documents/RTU estudijas"
+
+
+def documents_dir() -> Path:
+    """Īstā "Dokumenti" mape. Windows to bieži pārvirza uz OneDrive, tāpēc ~/Documents var būt cita mape."""
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class GUID(ctypes.Structure):
+                _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD), ("Data3", wintypes.WORD),
+                            ("Data4", ctypes.c_ubyte * 8)]
+            fid = GUID(0xFDD39AD0, 0x238F, 0x46AF, (ctypes.c_ubyte * 8)(0xAD, 0xB4, 0x6C, 0x85, 0x48, 0x03, 0x69, 0xC7))
+            buf = ctypes.c_wchar_p()
+            if ctypes.windll.shell32.SHGetKnownFolderPath(ctypes.byref(fid), 0, None, ctypes.byref(buf)) == 0:
+                path = Path(buf.value)
+                ctypes.windll.ole32.CoTaskMemFree(buf)
+                return path
+        except Exception:
+            pass
+    return Path.home() / "Documents"
+
+
+def resolve_output_dir(raw: str) -> Path:
+    if raw and raw.strip() != LEGACY_DEFAULT:
+        return _path(raw)
+    legacy = _path(LEGACY_DEFAULT)
+    if legacy.exists() and any(legacy.iterdir()):
+        return legacy  # jau ir faili vecajā noklusējuma vietā — nepārceļam bez ziņas
+    return documents_dir() / "RTU estudijas"
+
+
 def _path(p: str) -> Path:
     return Path(os.path.expandvars(os.path.expanduser(p)))
 
@@ -51,6 +84,7 @@ class Config:
     drive_folder: Path | None = None
     drive_categories: list[str] = field(default_factory=list)
     drive_include_digest: bool = True
+    drive_link: str = ""
 
 
 def load_config(profile: str = "default", path: Path | None = None) -> Config:
@@ -70,7 +104,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
     cfg = Config(
         profile=profile, data_dir=data_dir, config_path=path,
         site=str(raw.get("site", "https://estudijas.rtu.lv")).rstrip("/"),
-        output_dir=_path(raw.get("output_dir", "~/Documents/RTU estudijas")),
+        output_dir=resolve_output_dir(str(raw.get("output_dir", ""))),
         timezone=raw.get("timezone", "Europe/Riga"),
         course_folder_name=raw.get("course_folder_name", "fullname"),
         include_courses=list(raw.get("include_courses", [])),
@@ -91,7 +125,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         include_text_dates=bool(cal.get("include_text_dates", True)),
         reminders_minutes=[int(x) for x in cal.get("reminders_minutes", [1440, 120])][:5],
         google=bool(cal.get("google", False)),
-        google_credentials=_path(cal.get("google_credentials", str(APP_HOME / "credentials.json"))),
+        google_credentials=_path(cal.get("google_credentials") or str(APP_HOME / "credentials.json")),
         google_calendar_name=cal.get("google_calendar_name", "RTU estudijas"),
         categories=dict(raw["categories"]),
         email=str(raw.get("email", "")).strip(),
@@ -99,6 +133,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         drive_folder=_path(drive["folder"]) if drive.get("folder") else None,
         drive_categories=[str(x) for x in drive.get("categories", ["Mājas darbi"])],
         drive_include_digest=bool(drive.get("include_digest", True)),
+        drive_link=str(drive.get("link", "")).strip(),
     )
     if created:
         print(f"Izveidots konfigurācijas fails: {path}")

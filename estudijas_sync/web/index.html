@@ -122,6 +122,9 @@ h3:first-child { margin-top: 0; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 .chip { border: 1px solid var(--line); background: var(--sheet); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
+.linkish { background: none; border: 0; padding: 0; color: var(--md); cursor: pointer; font: inherit; text-decoration: underline; }
+.small-link { font-size: 14px; margin-top: 4px; display: inline-block; }
+.tl-more.linkish { font-size: 12px; margin-top: 4px; display: block; }
 .chip .sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--c); margin-right: 6px; }
 .search { flex: 1 1 200px; max-width: 320px; border: 1px solid var(--line); background: var(--sheet); border-radius: var(--radius-s); padding: 5px 10px; }
 label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
@@ -171,6 +174,48 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
 .suggest { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .suggest button { text-align: left; border: 1px dashed var(--line); background: none; padding: 4px 8px; cursor: pointer; font-size: 13px; border-radius: var(--radius-s); }
+/* termiņa logs */
+dialog#dlg { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 2px solid var(--ink); border-radius: var(--radius-m);
+  background: var(--sheet); color: var(--ink); padding: 18px 22px 22px; box-shadow: 0 18px 50px rgba(15, 34, 54, .28); }
+dialog#dlg::backdrop { background: rgba(15, 34, 54, .45); }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+#dlg-title { font: 700 26px/1.2 var(--font-head); margin: 10px 0 12px; }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 0 0 16px; font-size: 15px; }
+.facts dt { color: var(--ink-soft); }
+.facts dd { margin: 0; }
+.fulltext { white-space: pre-wrap; font: 15px/1.6 var(--font); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 12px 14px; max-height: 40vh; overflow: auto; margin: 0 0 16px; }
+.dlg-files { margin: 0 0 16px; padding: 0; list-style: none; }
+.dlg-files li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.dlg-files li span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dlg-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.tl-mark, .dl .title { cursor: pointer; }
+button.title { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; text-align: left; color: var(--ink); }
+button.title:hover { text-decoration: underline; }
+/* faili */
+.where { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 2px solid var(--ink); background: var(--sheet); padding: 10px 14px; margin-bottom: 16px; }
+.where small { display: block; color: var(--ink-soft); font-size: 12px; }
+.where b { font: 600 16px/1.35 var(--font-head); overflow-wrap: anywhere; }
+.where .row { margin: 0; }
+#out-warn { display: block; color: var(--bad); font-size: 13px; }
+.ffilters { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)) minmax(200px, 2fr); gap: 10px 12px; margin-bottom: 10px; }
+.ffilters .field select, .ffilters .field input { width: 100%; border: 1px solid var(--line); background: var(--sheet); border-radius: var(--radius-s); padding: 6px 8px; }
+.bulk { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 8px 0; border-bottom: 2px solid var(--ink); position: sticky; top: 0; background: var(--paper); z-index: 2; }
+.ftable td.c { width: 30px; }
+.ftable td.name b { font-weight: 600; display: block; overflow-wrap: anywhere; }
+.ftable td.name small { color: var(--ink-soft); }
+.ftable tr.sel { background: color-mix(in srgb, var(--md) 9%, transparent); }
+.ftable td.act { white-space: nowrap; text-align: right; }
+.ftable td.act .btn + .btn { margin-left: 6px; }
+.course-head td { font: 600 16px/1.3 var(--font-head); padding-top: 18px; border-bottom: 2px solid var(--ink); }
+.st { font-size: 13px; white-space: nowrap; }
+.st.here { color: var(--ok); } .st.missing { color: var(--bad); } .st.notdl, .st.other { color: var(--ink-soft); }
+@media (max-width: 760px) {
+  .ffilters { grid-template-columns: 1fr 1fr; }
+  .ffilters .grow { grid-column: 1 / -1; }
+  .ftable .hide-m { display: none; }
+  .facts { grid-template-columns: 1fr; gap: 0 0; }
+  .facts dd { margin-bottom: 6px; }
+}
 .folder-row { display: flex; gap: 8px; align-items: center; }
 .folder-row input { flex: 1; min-width: 0; }
 .move-box { margin-top: 10px; padding: 12px 14px; border: 2px solid var(--md); border-radius: var(--radius-m); background: color-mix(in srgb, var(--md) 7%, transparent); }
@@ -260,6 +305,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
       <div class="filters">
         <input class="search" id="q" type="search" placeholder="Meklēt kursu vai uzdevumu" aria-label="Meklēt">
         <label class="check"><input type="checkbox" id="show-done"> Rādīt izpildītos</label>
+        <button class="btn ghost small" id="show-past" type="button" aria-pressed="false">Rādīt pagājušos</button>
         <label class="check"><input type="checkbox" id="show-text" checked> Datumi no paziņojumiem</label>
         <a class="btn ghost small" id="ics-link" href="#" download="termini.ics">Lejupielādēt .ics</a>
       </div>
@@ -276,12 +322,37 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 
     <!-- FAILI -->
     <section data-panel="faili" hidden>
-      <div class="filters">
-        <button class="btn small" id="open-out" type="button">Atvērt mapi</button>
-        <span class="muted" id="out-path"></span>
-        <button class="btn ghost small" id="goto-folder" type="button">Mainīt mapi</button>
+      <div class="where">
+        <div><small>Faili tiek saglabāti mapē</small><b id="out-path">—</b><span id="out-warn"></span></div>
+        <div class="row">
+          <button class="btn small" id="open-out" type="button">Atvērt mapi</button>
+          <button class="btn ghost small" id="goto-folder" type="button">Mainīt mapi</button>
+          <a class="btn ghost small" id="drive-link" target="_blank" rel="noopener" hidden>Atvērt Google Drive</a>
+        </div>
       </div>
-      <div class="filters" id="file-filters"></div>
+      <div class="ffilters">
+        <div class="field"><label for="ff-course">Kurss</label><select id="ff-course"></select></div>
+        <div class="field"><label for="ff-dl">Termiņš</label><select id="ff-dl"></select></div>
+        <div class="field"><label for="ff-status">Statuss</label>
+          <select id="ff-status">
+            <option value="">Visi</option><option value="here">Ir mapē</option><option value="missing">Nav mapē</option>
+            <option value="notdl">Nav lejupielādēti</option><option value="other">Citām grupām</option>
+          </select></div>
+        <div class="field"><label for="ff-sort">Kārtot</label>
+          <select id="ff-sort">
+            <option value="new">Jaunākie augšā</option><option value="course">Pa kursiem</option>
+            <option value="name">Pēc nosaukuma</option><option value="size">Lielākie augšā</option>
+          </select></div>
+        <div class="field grow"><label for="ff-q">Meklēt</label><input id="ff-q" type="search" placeholder="Faila, tēmas vai sadaļas nosaukums"></div>
+      </div>
+      <div class="filters" id="file-cats"></div>
+      <div class="bulk" id="bulk">
+        <label class="check"><input type="checkbox" id="sel-all"> Atzīmēt redzamos</label>
+        <span class="muted" id="sel-count"></span>
+        <span style="flex:1"></span>
+        <button class="btn small" id="dl-selected" type="button" disabled>Lejupielādēt atzīmētos</button>
+        <button class="btn ghost small" id="sel-clear" type="button" disabled>Notīrīt</button>
+      </div>
       <div id="files"></div>
     </section>
 
@@ -340,14 +411,17 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         </div>
 
         <div class="panel">
-          <h4>Google Drive vai OneDrive</h4>
-          <p class="note">Kopē izvēlētos failus uz mapi, ko sinhronizē Drive for desktop vai OneDrive. Tā mājas darbi ir pieejami telefona Drive lietotnē.</p>
+          <h4>Google Drive</h4>
+          <p class="note">Kopē izvēlētos failus uz mapi, ko sinhronizē Google Drive for desktop. Tā tie ir pieejami telefona Drive lietotnē un pārlūkā.</p>
           <label class="toggle"><input type="checkbox" name="drive_enabled" id="f-drive"> <span>Kopēt uz Drive</span></label>
           <div class="form-grid" style="margin-top:12px">
             <div class="field"><label for="f-dfolder">Drive mape</label>
               <input type="text" id="f-dfolder" name="drive_folder" placeholder="G:/My Drive/RTU estudijas">
               <div class="row"><button class="btn ghost small" type="button" id="detect-drive">Atrast Drive mapi</button></div>
               <div class="suggest" id="drive-suggest"></div></div>
+            <div class="field"><label for="f-dlink">Saite uz šo mapi Google Drive</label>
+              <input type="text" id="f-dlink" name="drive_link" placeholder="https://drive.google.com/drive/folders/…">
+              <div class="hint">drive.google.com atver mapi, spied "Share" un "Copy link". Saite parādīsies panelī un UZDEVUMI.md.</div></div>
             <div class="field"><label>Ko kopēt</label>
               <div class="cats" id="drive-cats"></div>
               <label class="toggle" style="margin-top:10px"><input type="checkbox" name="drive_include_digest"> <span>Arī UZDEVUMI.md, JAUNUMI.md un termini.ics</span></label></div>
@@ -360,7 +434,6 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
             <div>
               <label class="toggle"><input type="checkbox" name="google" id="f-google"> <span>Google Calendar
                 <span class="hint muted" style="display:block;font-size:13px">Atsevišķā kalendārā, atjaunojas automātiski, redzams telefonā.</span></span></label>
-              <div class="row" id="gcal-row"></div>
             </div>
             <div>
               <label class="toggle"><input type="checkbox" name="ics"> <span>termini.ics fails
@@ -373,6 +446,13 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
               <input type="text" id="f-rem" name="reminders_minutes" placeholder="1440, 120">
               <div class="hint">1440 = diena, 120 = divas stundas</div></div>
           </div>
+          <div class="field" style="margin-top:16px"><label for="f-creds">Google credentials.json atrašanās vieta</label>
+            <div class="folder-row">
+              <input type="text" id="f-creds" name="google_credentials" spellcheck="false" placeholder="C:/Users/…/Downloads/client_secret_….json">
+              <button class="btn ghost small" type="button" id="pick-creds">Izvēlēties failu…</button>
+            </div>
+            <div class="hint">Google OAuth klienta fails (Desktop app tips). Izvēlies, kur tas atrodas datorā, vai augšupielādē to. Kā to iegūt, skat. cilnē Instrukcija.</div>
+            <div class="row" id="gcal-row"></div></div>
         </div>
 
         <div class="panel">
@@ -429,6 +509,14 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
     <button class="link" type="button" id="theme">Mainīt tēmu</button>
   </footer>
 </div>
+<dialog id="dlg" aria-labelledby="dlg-title">
+  <div class="dlg-head">
+    <div id="dlg-kind"></div>
+    <button class="btn ghost small" type="button" id="dlg-close" aria-label="Aizvērt">Aizvērt</button>
+  </div>
+  <h2 id="dlg-title"></h2>
+  <div id="dlg-body"></div>
+</dialog>
 <div class="toast" id="toast" role="status"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
@@ -548,7 +636,7 @@ function ago(iso) {
 
 /* ---------- stāvoklis ---------- */
 let STATUS = {}, VIEW = {}, CONFIG = null, FILES = [];
-const ui = { kinds: new Set(), q: "", showDone: false, showText: true, fileCat: "" };
+const ui = { kinds: new Set(), q: "", showDone: false, showText: true, showPast: false };
 
 async function loadStatus() {
   try { STATUS = await api("/api/status"); } catch (e) { return; }
@@ -574,7 +662,7 @@ async function loadStatus() {
     lastJobSeen = s.last_job && s.last_job.finished;
     if (!first && s.last_job) {
       toast(`${s.last_job.name}: ${s.last_job.message.split("\n\n")[0]}`, !s.last_job.ok);
-      if (s.last_job.name === "Sinhronizācija" || s.last_job.name === "Pieteikšanās") { await loadView(); loadFiles(); }
+      if (["Sinhronizācija", "Pieteikšanās", "Lejupielāde"].includes(s.last_job.name)) { await loadView(); loadFiles(); }
       if (s.last_job.name === "Google Calendar") loadConfig();
     }
     renderLastJob();
@@ -612,10 +700,13 @@ function renderTimeline() {
     const todays = items.filter(d => dayDiff(d.due) === i);
     todays.slice(0, 3).forEach(d => col.append(el("a", {
       class: "tl-mark" + (d.done ? " done" : "") + (d.source === "teksts" ? " guess" : ""),
-      style: `--c:${KIND[d.kind] || "var(--muted)"}`, href: d.url || "#", target: "_blank", rel: "noopener",
-      title: `${d.kind}: ${d.title}\n${d.course_full}\n${fmtDate(d.due)}${d.status ? "\n" + d.status : ""}`,
+      style: `--c:${KIND[d.kind] || "var(--muted)"}`, href: d.url || "#", role: "button",
+      title: `${d.kind}: ${d.title}\n${d.course_full}\n${fmtDate(d.due)}`,
+      onclick: e => { e.preventDefault(); openDeadline(d); }
     }, el("span", { class: "tl-t", text: d.source === "teksts" ? d.details : d.title }), el("span", { class: "tl-c", text: `${d.kind}, ${d.course}` }))));
-    if (todays.length > 3) col.append(el("div", { class: "tl-more", text: `vēl ${todays.length - 3}` }));
+    if (todays.length > 3) col.append(el("button", { class: "tl-more linkish", type: "button",
+      onclick: () => { ui.q = ""; $("#q").value = ""; showTab("termini"); document.getElementById("dl-list").scrollIntoView({ behavior: "smooth" }); },
+      text: `vēl ${todays.length - 3}` }));
     tl.append(col);
   }
 }
@@ -651,9 +742,11 @@ function dlRow(d) {
   const shownTitle = guess ? (d.details.length > 110 ? d.details.slice(0, 108) + "…" : d.details) : d.title;
   const body = el("div", { class: "body" },
     el("span", { class: "kind", style: `--c:${KIND[d.kind] || "var(--muted)"}`, text: d.kind }),
-    d.url ? el("a", { class: "title", href: d.url, target: "_blank", rel: "noopener", text: shownTitle }) : el("span", { class: "title", text: shownTitle }),
+    el("button", { class: "title", type: "button", text: shownTitle, onclick: () => openDeadline(d) }),
     meta);
-  if (d.details && !(guess && d.details.length <= 110)) body.append(el("details", {}, el("summary", { text: guess ? "Teksts" : "Apraksts" }), el("pre", { text: d.details })));
+  const nf = relatedFiles(d).length;
+  if (d.details || nf) body.append(el("button", { class: "linkish small-link", type: "button", onclick: () => openDeadline(d),
+    text: [d.details ? "Pilns apraksts" : "", nf ? `${nf} ${nf === 1 ? "fails" : "faili"}` : ""].filter(Boolean).join(", ") }));
   return el("div", { class: "dl" + (d.done ? " done" : "") + (guess ? " guess" : "") },
     el("div", { class: "date" }, el("span", { class: "n", text: due.getDate() }),
       el("span", { class: "m", text: MON[due.getMonth()] })),
@@ -677,18 +770,25 @@ function renderDeadlines() {
   const q = ui.q.toLowerCase(), now = new Date();
   const items = allItems().filter(d => kindMatch(d) && (ui.showDone || !d.done)
     && (!q || `${d.title} ${d.course_full} ${d.course} ${d.section}`.toLowerCase().includes(q)));
+  const past = allItems().filter(d => new Date(d.due) < now);
+  const overdue = past.filter(d => !d.done && d.status).length;
+  const pb = $("#show-past");
+  pb.textContent = ui.showPast ? "Slēpt pagājušos" : `Rādīt pagājušos${past.length ? ` (${past.length}${overdue ? `, ${overdue} nav iesniegti` : ""})` : ""}`;
+  pb.setAttribute("aria-pressed", String(ui.showPast));
+  pb.classList.toggle("danger", overdue > 0 && !ui.showPast);
   const groups = [
-    ["Nokavēts", d => new Date(d.due) < now && !d.done && d.status, true],
     ["Šodien un rīt", d => new Date(d.due) >= now && dayDiff(d.due) <= 1],
     ["Šonedēļ", d => dayDiff(d.due) >= 2 && dayDiff(d.due) <= 7],
     ["Šomēnes", d => dayDiff(d.due) > 7 && dayDiff(d.due) <= 31],
     ["Vēlāk", d => dayDiff(d.due) > 31],
   ];
+  if (ui.showPast) groups.unshift(["Pagājušie", d => new Date(d.due) < now, false, true]);
   const open = allItems().filter(d => !d.done && new Date(d.due) >= now && dayDiff(d.due) <= 7).length;
   $("#cnt-dl").textContent = open ? String(open) : "";
   let shown = 0;
-  for (const [title, fn, alert] of groups) {
-    const rows = items.filter(fn);
+  for (const [title, fn, alert, rev] of groups) {
+    let rows = items.filter(fn);
+    if (rev) rows = rows.reverse();
     if (!rows.length) continue;
     shown += rows.length;
     list.append(el("div", { class: "group-title" + (alert ? " alert" : ""), text: `${title} (${rows.length})` }), ...rows.map(dlRow));
@@ -722,25 +822,162 @@ async function renderChanges() {
 }
 
 /* ---------- faili ---------- */
+let FD = { files: [], output_dir: "" };
+const sel = new Set();
+const fui = { course: "", dl: "", status: "", sort: "new", q: "", cats: new Set() };
+const ST_LABEL = { here: "ir mapē", missing: "nav mapē", notdl: "nav lejupielādēts", other: "citai grupai", error: "kļūda" };
+function fileState(f) {
+  if (f.status === "downloaded") return f.exists ? "here" : "missing";
+  if (f.status === "other" || f.other_group) return f.status === "downloaded" ? "here" : "other";
+  if (f.status === "error") return "error";
+  return "notdl";
+}
+function fileWhy(f) {
+  return { unselected: "kategorija nav atlasīta iestatījumos", other: "citai grupai vai programmai", ext: "izlaists pēc faila tipa",
+    big: "lielāks par atļauto izmēru", error: "lejupielāde neizdevās", pending: "vēl nav lejupielādēts" }[f.status] || "";
+}
+function fileTime(f) {
+  return f.modified > 1e9 ? new Date(f.modified * 1000).toISOString() : (f.first_seen || f.downloaded_at || "");
+}
+function fmtSize(n) { return n == null ? "" : n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`; }
+function relatedFiles(d) {
+  const m = /^cm-(\d+)$/.exec(d.uid || "");
+  return (FD.files || []).filter(f => f.course_id === d.course_id && (
+    (m && f.cmid === m[1]) || (d.section && f.section === d.section && f.modtype !== "assign")));
+}
 async function loadFiles() {
-  try { FILES = await api("/api/files"); } catch (e) { FILES = []; }
-  renderFiles();
+  try { FD = await api("/api/files"); } catch (e) { FD = { files: [], output_dir: "" }; }
+  $("#out-path").textContent = FD.output_dir || STATUS.output_dir || "—";
+  const here = FD.files.filter(f => fileState(f) === "here").length;
+  const missing = FD.files.filter(f => fileState(f) === "missing").length;
+  $("#out-warn").textContent = !FD.exists ? "Šī mape vēl neeksistē. Tā tiks izveidota pirmajā sinhronizācijā."
+    : missing ? `${missing} lejupielādēti faili šajā mapē nav atrodami (izdzēsti vai pārvietoti). Atzīmē tos un lejupielādē vēlreiz.` : "";
+  const dlLink = CONFIG && CONFIG.values.drive_link;
+  $("#drive-link").hidden = !dlLink; if (dlLink) $("#drive-link").href = dlLink;
+  buildFileFilters(); renderFiles();
+  if (VIEW.generated) renderDeadlines();
+}
+function buildFileFilters() {
+  const courses = [...new Map(FD.files.map(f => [f.course_id, f.course_full || f.course])).entries()].sort((a, b) => String(a[1]).localeCompare(b[1]));
+  const cs = $("#ff-course"); const cur = fui.course;
+  cs.replaceChildren(el("option", { value: "", text: "Visi kursi" }), ...courses.map(([id, n]) => el("option", { value: id, text: n })));
+  cs.value = cur;
+  const ds = $("#ff-dl"); const curd = fui.dl;
+  const dls = (VIEW.deadlines || []).filter(d => relatedFiles(d).length);
+  ds.replaceChildren(el("option", { value: "", text: "Visi" }),
+    ...dls.map(d => el("option", { value: d.uid, text: `${fmtDate(d.due, false)} ${d.kind} ${d.course}: ${d.title}`.slice(0, 80) })));
+  ds.value = curd;
+  const cats = [...new Set(FD.files.map(f => f.category))].filter(Boolean).sort();
+  $("#file-cats").replaceChildren(
+    el("button", { class: "chip", type: "button", "aria-pressed": String(!fui.cats.size), onclick: () => { fui.cats.clear(); buildFileFilters(); renderFiles(); } }, "Visi tipi"),
+    ...cats.map(c => el("button", { class: "chip", type: "button", "aria-pressed": String(fui.cats.has(c)),
+      onclick: () => { fui.cats.has(c) ? fui.cats.delete(c) : fui.cats.add(c); buildFileFilters(); renderFiles(); } },
+      `${c} (${FD.files.filter(f => f.category === c && (!fui.course || String(f.course_id) === fui.course)).length})`)));
+}
+function visibleFiles() {
+  const q = fui.q.toLowerCase();
+  const dl = fui.dl ? [...(VIEW.deadlines || [])].find(d => d.uid === fui.dl) : null;
+  const relKeys = dl ? new Set(relatedFiles(dl).map(f => f.key)) : null;
+  let rows = FD.files.filter(f =>
+    (!fui.course || String(f.course_id) === fui.course) && (!fui.cats.size || fui.cats.has(f.category))
+    && (!relKeys || relKeys.has(f.key))
+    && (!fui.status || (fui.status === "notdl" ? ["notdl", "error"].includes(fileState(f)) : fileState(f) === fui.status))
+    && (fui.status === "other" || fui.status ? true : fileState(f) !== "other")
+    && (!q || `${f.filename} ${f.module} ${f.section}`.toLowerCase().includes(q)));
+  const by = { new: (a, b) => fileTime(b).localeCompare(fileTime(a)), name: (a, b) => a.filename.localeCompare(b.filename),
+    size: (a, b) => (b.size || 0) - (a.size || 0),
+    course: (a, b) => (a.course_full || "").localeCompare(b.course_full || "") || a.category.localeCompare(b.category) || a.filename.localeCompare(b.filename) };
+  return rows.sort(by[fui.sort]);
+}
+function fileRow(f) {
+  const st = fileState(f);
+  const cb = el("input", { type: "checkbox", "aria-label": `Atzīmēt ${f.filename}`, checked: sel.has(f.key),
+    onchange: e => { e.target.checked ? sel.add(f.key) : sel.delete(f.key); tr.classList.toggle("sel", e.target.checked); updateBulk(); } });
+  const act = st === "here"
+    ? [el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt"),
+       el("button", { class: "btn ghost small", type: "button", onclick: () => reveal(f.path) }, "Parādīt mapē")]
+    : [el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, "Lejupielādēt")];
+  const tr = el("tr", { class: sel.has(f.key) ? "sel" : "" },
+    el("td", { class: "c" }, cb),
+    el("td", { class: "name" }, el("b", { text: f.filename }), el("small", { text: [f.module !== f.filename ? f.module : "", f.section].filter(Boolean).join(", ") })),
+    el("td", { class: "hide-m", text: f.course }),
+    el("td", { class: "hide-m", text: f.category }),
+    el("td", { class: "hide-m", text: fileTime(f) ? fmtDate(fileTime(f), false) : "" }),
+    el("td", { class: "hide-m", text: fmtSize(f.size) }),
+    el("td", {}, el("span", { class: "st " + st, title: fileWhy(f), text: ST_LABEL[st] })),
+    el("td", { class: "act" }, act));
+  return tr;
 }
 function renderFiles() {
-  const cats = [...new Set(FILES.map(f => f.category))].filter(Boolean).sort();
-  const ff = $("#file-filters"); ff.replaceChildren(
-    el("button", { class: "chip", type: "button", "aria-pressed": String(!ui.fileCat), onclick: () => { ui.fileCat = ""; renderFiles(); } }, "Visi"),
-    ...cats.map(c => el("button", { class: "chip", type: "button", "aria-pressed": String(ui.fileCat === c), onclick: () => { ui.fileCat = c; renderFiles(); } }, c)));
-  const rows = FILES.filter(f => !ui.fileCat || f.category === ui.fileCat);
   const box = $("#files"); box.replaceChildren();
-  if (!rows.length) { box.append(el("div", { class: "empty", text: "Vēl nav lejupielādētu failu." })); return; }
-  box.append(el("table", {}, el("thead", {}, el("tr", {}, el("th", { text: "Fails" }), el("th", { text: "Kurss" }),
-    el("th", { text: "Kategorija" }), el("th", { text: "Lejupielādēts" }), el("th", {}))),
-    el("tbody", {}, rows.map(f => el("tr", {},
-      el("td", { class: "path", text: f.path.split("/").slice(-1)[0] }), el("td", { text: f.course }),
-      el("td", { text: f.category }), el("td", { text: f.downloaded ? fmtDate(f.downloaded) : "" }),
-      el("td", {}, el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt")))))));
+  if (!FD.files.length) { box.append(el("div", { class: "empty", text: VIEW.generated ? "Estudijās netika atrasts neviens fails." : "Vispirms sinhronizē." })); updateBulk(); return; }
+  const rows = visibleFiles();
+  if (!rows.length) { box.append(el("div", { class: "empty", text: "Nekas neatbilst filtriem." })); updateBulk(); return; }
+  const body = el("tbody");
+  let lastCourse = null;
+  for (const f of rows.slice(0, 600)) {
+    if (fui.sort === "course" && f.course_full !== lastCourse) {
+      lastCourse = f.course_full;
+      body.append(el("tr", { class: "course-head" }, el("td", { colspan: 8, text: f.course_full || f.course })));
+    }
+    body.append(fileRow(f));
+  }
+  box.append(el("table", { class: "ftable" }, el("thead", {}, el("tr", {}, el("th", {}), el("th", { text: "Fails" }),
+    el("th", { class: "hide-m", text: "Kurss" }), el("th", { class: "hide-m", text: "Tips" }), el("th", { class: "hide-m", text: "Datums" }),
+    el("th", { class: "hide-m", text: "Izmērs" }), el("th", { text: "Statuss" }), el("th", {}))), body));
+  if (rows.length > 600) box.append(el("p", { class: "note", text: `Rādīti 600 no ${rows.length}. Sašaurini filtrus.` }));
+  updateBulk();
 }
+function updateBulk() {
+  const vis = visibleFiles();
+  $("#sel-count").textContent = sel.size ? `Atzīmēti ${sel.size}` : `${vis.length} faili`;
+  $("#dl-selected").disabled = !sel.size; $("#sel-clear").disabled = !sel.size;
+  $("#sel-all").checked = vis.length > 0 && vis.every(f => sel.has(f.key));
+}
+async function downloadKeys(keys) {
+  try { await post("/api/download", { keys }); toast(`Lejupielādē ${keys.length} ${keys.length === 1 ? "failu" : "failus"}…`); setTimeout(loadStatus, 200); }
+  catch (e) { toast(e.message, true); }
+}
+async function reveal(p) { try { await post("/api/reveal", { path: p }); } catch (e) { toast(e.message, true); } }
+
+/* ---------- termiņa logs ---------- */
+function openDeadline(d) {
+  const dlg = $("#dlg"), guess = d.source === "teksts";
+  $("#dlg-kind").replaceChildren(el("span", { class: "kind", style: `--c:${KIND[d.kind] || "var(--muted)"}`, text: d.kind }),
+    el("span", { class: "muted", text: d.course_full || d.course }));
+  $("#dlg-title").textContent = guess ? `${d.kind}: datums no paziņojuma` : d.title;
+  const course = (VIEW.courses || []).find(c => c.id === d.course_id);
+  const relLabel = { "tev": "tavai grupai" }[d.relevance] || d.relevance;
+  const facts = el("dl", { class: "facts" },
+    el("dt", { text: "Termiņš" }), el("dd", {}, el("b", { text: fmtDate(d.due) }), ` (${rel(d.due)})`),
+    d.start ? [el("dt", { text: "Atveras" }), el("dd", { text: fmtDate(d.start) })] : null,
+    d.status ? [el("dt", { text: "Statuss" }), el("dd", { class: d.done ? "status ok" : "status todo", text: d.status })] : null,
+    d.section ? [el("dt", { text: "Sadaļa" }), el("dd", { text: d.section })] : null,
+    relLabel ? [el("dt", { text: "Grupa" }), el("dd", { text: relLabel })] : null,
+    guess ? [el("dt", { text: "Avots" }), el("dd", { text: `${d.title.replace(/^[^(]*\((.*)\)$/, "$1")}. Datums atrasts tekstā automātiski, pārbaudi.` })] : null);
+  const files = relatedFiles(d);
+  const body = [facts];
+  if (d.details) body.push(el("pre", { class: "fulltext", text: d.details }));
+  else body.push(el("p", { class: "note", text: "Apraksta nav. Pilnu informāciju skaties estudijās." }));
+  if (files.length) {
+    body.push(el("h3", { text: `Faili (${files.length})` }), el("ul", { class: "dlg-files" }, files.map(f => {
+      const st = fileState(f);
+      return el("li", {}, el("span", { text: f.filename }), el("span", { class: "st " + st, style: "flex:none", text: ST_LABEL[st] }),
+        st === "here" ? el("button", { class: "btn ghost small", type: "button", onclick: () => openPath(f.path) }, "Atvērt")
+          : el("button", { class: "btn ghost small", type: "button", onclick: () => downloadKeys([f.key]) }, "Lejupielādēt"));
+    })));
+    const missing = files.filter(f => fileState(f) !== "here");
+    if (missing.length > 1) body.push(el("button", { class: "btn small", type: "button", style: "margin:-6px 0 16px",
+      onclick: () => downloadKeys(missing.map(f => f.key)) }, `Lejupielādēt visus ${missing.length}`));
+  }
+  body.push(el("div", { class: "dlg-actions" },
+    d.url ? el("a", { class: "btn", href: d.url, target: "_blank", rel: "noopener" }, guess ? "Atvērt avotu estudijās" : "Atvērt estudijās") : null,
+    course ? el("a", { class: "btn ghost", href: course.url, target: "_blank", rel: "noopener" }, "Atvērt kursu") : null,
+    files.length ? el("button", { class: "btn ghost", type: "button", onclick: () => { dlg.close(); fui.dl = d.uid; fui.course = ""; fui.cats.clear(); showTab("faili"); } }, "Rādīt failos") : null));
+  $("#dlg-body").replaceChildren(...body.flat());
+  dlg.showModal();
+}
+
 async function openPath(p) {
   try { await post("/api/open", { path: p }); } catch (e) { toast(e.message, true); }
 }
@@ -783,14 +1020,15 @@ async function saveConfig(e) {
 function renderGcalRow() {
   const row = $("#gcal-row"); if (!row) return; row.replaceChildren();
   if (!STATUS.google_credentials) {
+    row.append(el("span", { class: "pill warn", text: "credentials.json nav atrasts" }));
     const file = el("input", { type: "file", accept: ".json,application/json", style: "display:none",
       onchange: async () => {
         const txt = await file.files[0].text();
         try { await post("/api/credentials", { content: txt }); toast("credentials.json saglabāts"); loadStatus(); }
         catch (err) { toast(err.message, true); }
       } });
-    row.append(el("span", { class: "note", text: "Vajag Google OAuth klienta failu (Desktop app). Kā to iegūt, skat. instrukcijā." }), file,
-      el("button", { class: "btn ghost small", type: "button", onclick: () => file.click() }, "Augšupielādēt credentials.json"));
+    row.append(file, el("button", { class: "btn ghost small", type: "button", onclick: () => file.click() }, "Augšupielādēt failu"),
+      );
   } else {
     row.append(STATUS.google_token ? el("span", { class: "pill ok", text: "savienots" }) : el("span", { class: "pill warn", text: "nav savienots" }),
       el("button", { class: "btn ghost small", type: "button", onclick: () => runJob("gcal") },
@@ -854,7 +1092,7 @@ function showTab(name) {
   $$("section[data-panel]").forEach(s => s.hidden = s.dataset.panel !== name);
   if (name === "readme" && !$("#readme").childElementCount) api("/api/doc?name=README").then(r => $("#readme").replaceChildren(md(r.text)));
   if (name === "zurnals") loadLog();
-  if (name === "faili") loadFiles();
+  if (name === "faili") loadFiles().then(() => { $("#ff-dl").value = fui.dl; $("#ff-course").value = fui.course; renderFiles(); });
   try { localStorage.setItem("tab", name); } catch (e) { }
 }
 
@@ -862,6 +1100,14 @@ function showTab(name) {
 $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[data-tab]"); if (b) showTab(b.dataset.tab); });
 $("#btn-sync").addEventListener("click", startSync);
 $("#q").addEventListener("input", e => { ui.q = e.target.value; renderDeadlines(); });
+$("#show-past").addEventListener("click", () => { ui.showPast = !ui.showPast; renderDeadlines(); });
+$("#dlg-close").addEventListener("click", () => $("#dlg").close());
+$("#dlg").addEventListener("click", e => { if (e.target.id === "dlg") $("#dlg").close(); });
+["course", "dl", "status", "sort"].forEach(k => $(`#ff-${k}`).addEventListener("change", e => { fui[k] = e.target.value; if (k === "course") buildFileFilters(); renderFiles(); }));
+$("#ff-q").addEventListener("input", e => { fui.q = e.target.value; renderFiles(); });
+$("#sel-all").addEventListener("change", e => { visibleFiles().forEach(f => e.target.checked ? sel.add(f.key) : sel.delete(f.key)); renderFiles(); });
+$("#sel-clear").addEventListener("click", () => { sel.clear(); renderFiles(); });
+$("#dl-selected").addEventListener("click", () => downloadKeys([...sel]));
 $("#show-done").addEventListener("change", e => { ui.showDone = e.target.checked; renderDeadlines(); renderTimeline(); });
 $("#show-text").addEventListener("change", e => { ui.showText = e.target.checked; renderDeadlines(); renderTimeline(); });
 $("#cfg-form").addEventListener("submit", saveConfig);
@@ -907,6 +1153,14 @@ $$("#move-box [data-mode]").forEach(btn => btn.addEventListener("click", async (
   finally { $$("#move-box button").forEach(x => x.disabled = false); }
 }));
 $("#open-out2").addEventListener("click", () => openPath(""));
+$("#pick-creds").addEventListener("click", async () => {
+  const b = $("#pick-creds"); b.disabled = true; b.textContent = "Atver logu…";
+  try {
+    const r = await post("/api/pick-credentials", {});
+    if (r.path) { toast("credentials.json atrasts un saglabāts iestatījumos"); await loadConfig(); loadStatus(); }
+  } catch (e) { toast(e.message, true); }
+  finally { b.disabled = false; b.textContent = "Izvēlēties failu…"; }
+});
 $("#detect-drive").addEventListener("click", async () => {
   const box = $("#drive-suggest"); box.replaceChildren();
   const found = await api("/api/drive/detect");

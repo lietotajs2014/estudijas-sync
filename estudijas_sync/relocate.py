@@ -26,8 +26,12 @@ try:
     root.attributes("-topmost", True)
 except Exception:
     pass
-p = filedialog.askdirectory(initialdir=sys.argv[1] if len(sys.argv) > 1 else None,
-                            title="Izvēlies mapi RTU estudiju failiem", mustexist=False)
+mode, init = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else None)
+if mode == "file":
+    p = filedialog.askopenfilename(initialdir=init, title="Izvēlies Google credentials.json",
+                                   filetypes=[("JSON", "*.json"), ("Visi faili", "*.*")])
+else:
+    p = filedialog.askdirectory(initialdir=init, title="Izvēlies mapi RTU estudiju failiem", mustexist=False)
 root.destroy()
 sys.stdout.write(p or "")
 """
@@ -35,13 +39,24 @@ sys.stdout.write(p or "")
 
 def pick_folder(initial: str = "") -> str | None:
     """Atver sistēmas mapes izvēles logu (atsevišķā procesā). None — atcelts; izmet RuntimeError, ja nav pieejams."""
-    init = initial if initial and Path(initial).exists() else str(Path.home())
-    r = subprocess.run([sys.executable, "-c", _PICKER, init], capture_output=True, text=True, timeout=600,
+    return _pick("dir", initial)
+
+
+def pick_file(initial: str = "") -> str | None:
+    """Atver sistēmas faila izvēles logu (JSON)."""
+    p = Path(initial) if initial else None
+    return _pick("file", str(p.parent) if p and p.parent.exists() else "")
+
+
+def _pick(mode: str, initial: str) -> str | None:
+    init = initial if initial and Path(initial).exists() else str(Path.home() / "Downloads") \
+        if (Path.home() / "Downloads").exists() and mode == "file" else str(Path.home())
+    r = subprocess.run([sys.executable, "-c", _PICKER, mode, init], capture_output=True, text=True, timeout=600,
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if r.returncode == 3:
-        raise RuntimeError("Mapes izvēles logs nav pieejams (nav tkinter). Ieraksti ceļu pats.")
+        raise RuntimeError("Izvēles logs nav pieejams (nav tkinter). Ieraksti ceļu pats.")
     if r.returncode != 0:
-        raise RuntimeError(r.stderr.strip()[-300:] or "Mapes izvēle neizdevās")
+        raise RuntimeError(r.stderr.strip()[-300:] or "Izvēle neizdevās")
     path = r.stdout.strip()
     return str(Path(path)) if path else None
 

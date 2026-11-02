@@ -279,7 +279,7 @@ class WebSource:
                 res.add_deadline(Deadline(f"cm-{cmid}", c.id, classify_kind(name, "Tests"), name, due,
                                           start=dates.get("open") if dates.get("due") else None, url=url,
                                           status="izpildīts" if attempted else "nav izpildīts",
-                                          details=self._intro_text(soup)[:800], section=sec["name"]))
+                                          details=self._intro_text(soup)[:3000], section=sec["name"]))
         elif mt == "page":
             soup = self.soup(url)
             main = soup.select_one("div.box.generalbox, [role=main] .generalbox, #region-main")
@@ -347,7 +347,7 @@ class WebSource:
         res.texts.append(TextBlock(c.id, name, "\n".join(lines + ["", intro]).strip(), url, "uzdevums"))
         if dates.get("due"):
             res.add_deadline(Deadline(f"cm-{cmid}", c.id, kind, name, dates["due"], start=dates.get("open"),
-                                      url=url, status=status, details=intro[:1500], section=section))
+                                      url=url, status=status, details=intro[:5000], section=section))
 
     def _forum(self, c: Course, url: str, res: CollectResult) -> None:
         soup = self.soup(url)
@@ -412,7 +412,7 @@ class WebSource:
                 desc = html_to_text(e.get("description"))
                 res.add_deadline(Deadline(f"event-{e.get('id')}", cid, classify_kind(f"{name} {desc}", "Notikums"),
                                           name, dt + timedelta(seconds=dur) if dur else dt,
-                                          start=dt if dur else None, url=url, details=desc[:800]))
+                                          start=dt if dur else None, url=url, details=desc[:3000]))
 
     # ---------------------------------------------------------------
     def download(self, item: FileItem, dest: Path, on_bytes=None) -> int:
