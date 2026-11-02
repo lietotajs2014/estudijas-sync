@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RTU estudijas</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-row">
+    <div class="brand">
+      <h1>RTU estudijas</h1>
+      <small id="stamp">Nav sinhronizēts</small>
+    </div>
+    <button class="icon-btn" id="btn-sync" type="button" aria-label="Sinhronizēt">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16m0 4v-4h-4"/></svg>
+    </button>
+  </div>
+  <div class="progress" id="progress"><div class="bar"><div class="fill" id="progress-fill"></div></div><small id="progress-text"></small></div>
+</header>
+
+<main id="main">
+  <section id="welcome" class="view" hidden>
+    <div class="card welcome">
+      <h2>Sveiks!</h2>
+      <p>Šī lietotne parāda tavus termiņus (MD, KD, testi), konsultācijas un kursu failus no estudijas.rtu.lv. Faili netiek lejupielādēti — tie atveras pārlūkā.</p>
+      <ol>
+        <li>Ieraksti savu programmu un grupu (lai rādītu tikai tev domāto).</li>
+        <li>Spied <b>Pieslēgties</b> un ielogojies ar RTU kontu (Microsoft, ar MFA kodu).</li>
+      </ol>
+      <label class="field">Studiju programma <input id="w-program" autocomplete="off" autocapitalize="characters" placeholder="piem. RMCE0"></label>
+      <label class="field">Grupa <input id="w-group" inputmode="numeric" autocomplete="off" placeholder="piem. 3"></label>
+      <label class="field">RTU e-pasts (neobligāti, lai ieliktu pieteikšanās logā) <input id="w-email" type="email" autocomplete="email" placeholder="vards.uzvards@edu.rtu.lv"></label>
+      <button class="btn wide" type="button" id="btn-login">Pieslēgties</button>
+      <p class="muted small">Parole netiek saglabāta. Lietotne glabā tikai estudiju sistēmas piekļuves atslēgu šajā telefonā.</p>
+    </div>
+  </section>
+
+  <section id="v-deadlines" class="view" hidden>
+    <div id="news"></div>
+    <div class="timeline" id="timeline" aria-label="Nākamās 2 nedēļas"></div>
+    <div class="filters">
+      <select id="f-course" aria-label="Kurss"></select>
+      <div class="seg" id="f-status" role="group" aria-label="Statuss">
+        <button type="button" data-v="open" class="on">Neizpildīti</button>
+        <button type="button" data-v="all">Visi</button>
+        <button type="button" data-v="done">Izpildīti</button>
+      </div>
+    </div>
+    <div id="dl-list"></div>
+    <button class="btn ghost wide" type="button" id="btn-past">Rādīt pagājušos</button>
+    <div id="dl-past"></div>
+  </section>
+
+  <section id="v-consult" class="view" hidden>
+    <div id="consult-list"></div>
+  </section>
+
+  <section id="v-files" class="view" hidden>
+    <div class="filters">
+      <input id="ff-q" type="search" placeholder="Meklēt failu…" aria-label="Meklēt">
+      <div class="row2">
+        <select id="ff-course" aria-label="Kurss"></select>
+        <select id="ff-cat" aria-label="Kategorija"></select>
+      </div>
+      <div class="seg" id="ff-sort" role="group" aria-label="Kārtot">
+        <button type="button" data-v="deadline" class="on">Pēc termiņa</button>
+        <button type="button" data-v="new">Jaunākie</button>
+      </div>
+    </div>
+    <div id="files-list"></div>
+  </section>
+
+  <section id="v-settings" class="view" hidden>
+    <div class="card" id="account"></div>
+    <div class="card">
+      <h3>Kas ir tavs</h3>
+      <label class="field">Studiju programma <input id="s-program" autocomplete="off" autocapitalize="characters" placeholder="piem. RMCE0"></label>
+      <label class="field">Grupa <input id="s-group" inputmode="numeric" autocomplete="off" placeholder="piem. 3"></label>
+      <label class="toggle"><input type="checkbox" id="s-other"> <span>Rādīt arī citām grupām/programmām domāto</span></label>
+      <label class="toggle"><input type="checkbox" id="s-auto" checked> <span>Sinhronizēt, atverot lietotni (ja pēdējā reize bija pirms 30+ min.)</span></label>
+      <label class="field">RTU e-pasts pieteikšanās logam <input id="s-email" type="email" autocomplete="email"></label>
+      <button class="btn" type="button" id="btn-save">Saglabāt un sinhronizēt</button>
+    </div>
+    <div class="card">
+      <h3>Par lietotni</h3>
+      <p class="small">Dati tiek ņemti no estudijas.rtu.lv ar to pašu piekļuvi, ko izmanto oficiālā Moodle lietotne. Viss paliek tikai šajā telefonā. Faili atveras pārlūkā — telefonā nekas netiek lejupielādēts automātiski.</p>
+      <p class="small muted" id="version"></p>
+      <div id="warnings"></div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" id="tabs" hidden>
+  <button type="button" data-tab="deadlines" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/></svg>Termiņi</button>
+  <button type="button" data-tab="consult"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0"/></svg>Konsultācijas</button>
+  <button type="button" data-tab="files"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l5 5v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM14 3v5h5"/></svg>Faili</button>
+  <button type="button" data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Iestatījumi</button>
+</nav>
+
+<div class="sheet-back" id="sheet-back" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden>
+  <div class="grip"></div>
+  <div id="sheet-kind"></div>
+  <h2 id="sheet-title"></h2>
+  <div id="sheet-body"></div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="logic.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

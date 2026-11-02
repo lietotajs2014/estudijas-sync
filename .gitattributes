@@ -1,3 +1,6 @@
 start.bat text eol=crlf
 *.command text eol=lf
 *.py text eol=lf
+android/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
