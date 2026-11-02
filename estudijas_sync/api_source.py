@@ -183,7 +183,7 @@ class ApiSource:
                 if not due:
                     continue
                 status = None
-                if now - 21 * 86400 < due < now + self.cfg.lookahead_days * 86400:
+                if now - self.cfg.lookback_days * 86400 < due < now + self.cfg.lookahead_days * 86400:
                     status = self._assign_status(a["id"])
                 details = intro[:5000]
                 if a.get("cutoffdate"):
@@ -243,7 +243,7 @@ class ApiSource:
         now = int(time.time())
         data = self.api.call("core_calendar_get_calendar_events",
                              events={"courseids": ids},
-                             options={"userevents": 1, "siteevents": 1, "timestart": now - 14 * 86400,
+                             options={"userevents": 1, "siteevents": 1, "timestart": now - self.cfg.lookback_days * 86400,
                                       "timeend": now + self.cfg.lookahead_days * 86400})
         for e in data.get("events", []):
             mod = e.get("modulename") or ""

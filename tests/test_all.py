@@ -322,6 +322,19 @@ def test_change_folder():
             pass
 
 
+def test_calendar_colors():
+    from datetime import timedelta as td
+    from estudijas_sync.gcal import COLOR_DONE, COLOR_OVERDUE, COLOR_PAST, color_for
+    from estudijas_sync.model import Deadline
+    now = NOW.replace(tzinfo=TZ)
+    mk = lambda **k: Deadline(uid="x", course_id=1, kind=k.pop("kind", "MD"), title="t", **k)  # noqa: E731
+    assert color_for(mk(due=now - td(days=3), status="iesniegts"), now) == COLOR_DONE
+    assert color_for(mk(due=now + td(days=3), status="novērtēts: 9 / 10"), now) == COLOR_DONE
+    assert color_for(mk(due=now - td(days=3), status="nav iesniegts"), now) == COLOR_OVERDUE
+    assert color_for(mk(due=now - td(days=3), status=None, kind="Eksāmens"), now) == COLOR_PAST
+    assert color_for(mk(due=now + td(days=3), status="nav iesniegts", kind="KD"), now) == "3"
+
+
 def test_webui():
     import json as _json
     import threading

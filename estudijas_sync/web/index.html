@@ -10,7 +10,7 @@
 :root {
   --paper: #eef2f4; --sheet: #fbfcfd; --grid: #d6dfe5; --grid-strong: #b9c7d1;
   --ink: #1b2b3a; --ink-soft: #586977; --line: #c7d2da;
-  --kd: #c2362f; --md: #1f5fbf; --test: #b47b00; --ld: #2e7d4f; --other: #7a6a9c; --muted: #8796a2;
+  --kd: #7b45b8; --md: #1f5fbf; --test: #b47b00; --ld: #0f7f86; --other: #7a6a9c; --muted: #8796a2;
   --ok: #2e7d4f; --warn: #b47b00; --bad: #c2362f;
   --focus: #1f5fbf; --btn: #1b2b3a; --btn-ink: #fbfcfd;
   --radius-s: 3px; --radius-m: 6px;
@@ -21,14 +21,14 @@
   :root:not([data-theme="light"]) {
     --paper: #0f2236; --sheet: #132a42; --grid: #1c3753; --grid-strong: #29507a;
     --ink: #e6eef5; --ink-soft: #9fb3c6; --line: #2a4766;
-    --kd: #ff7a70; --md: #79aef7; --test: #f2c14e; --ld: #6fd39a; --other: #b9a7e0; --muted: #7f95aa;
+    --kd: #c6a0f5; --md: #79aef7; --test: #f2c14e; --ld: #5fd3d9; --other: #b9a7e0; --muted: #7f95aa;
     --ok: #6fd39a; --warn: #f2c14e; --bad: #ff7a70; --focus: #79aef7; --btn: #e6eef5; --btn-ink: #0f2236;
   }
 }
 :root[data-theme="dark"] {
   --paper: #0f2236; --sheet: #132a42; --grid: #1c3753; --grid-strong: #29507a;
   --ink: #e6eef5; --ink-soft: #9fb3c6; --line: #2a4766;
-  --kd: #ff7a70; --md: #79aef7; --test: #f2c14e; --ld: #6fd39a; --other: #b9a7e0; --muted: #7f95aa;
+  --kd: #c6a0f5; --md: #79aef7; --test: #f2c14e; --ld: #5fd3d9; --other: #b9a7e0; --muted: #7f95aa;
   --ok: #6fd39a; --warn: #f2c14e; --bad: #ff7a70; --focus: #79aef7; --btn: #e6eef5; --btn-ink: #0f2236;
 }
 * { box-sizing: border-box; }
@@ -154,7 +154,13 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .dl details { margin-top: 6px; }
 .dl details summary { cursor: pointer; font-size: 14px; color: var(--ink-soft); }
 .dl details pre { white-space: pre-wrap; font: 14px/1.5 var(--font); margin: 6px 0 0; max-width: 75ch; }
-.dl.done .title { text-decoration: line-through; color: var(--ink-soft); }
+.dl.done .date { border-color: var(--ok); color: var(--ok); border-width: 2px; }
+.dl.done .title { color: var(--ink-soft); }
+.dl.overdue .date { border-color: var(--bad); color: var(--bad); border-width: 2px; }
+.dl.overdue .rel { color: var(--bad); }
+.dl.past .date { border-color: var(--muted); color: var(--muted); }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); margin: -4px 0 10px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--c); margin-right: 6px; vertical-align: -1px; }
 .dl.guess .date { border-style: dashed; }
 .empty { padding: 32px; border: 2px dashed var(--line); text-align: center; color: var(--ink-soft); }
 .empty .btn { margin-top: 12px; }
@@ -313,6 +319,10 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         <label class="check"><input type="checkbox" id="show-text" checked> Datumi no paziņojumiem</label>
         <a class="btn ghost small" id="ics-link" href="#" download="termini.ics">Lejupielādēt .ics</a>
       </div>
+      <div class="legend"><span><i style="--c:var(--ok)"></i>iesniegts vai izpildīts</span>
+        <span><i style="--c:var(--bad)"></i>nokavēts (nav iesniegts)</span>
+        <span><i style="--c:var(--muted)"></i>pagājis</span>
+        <span><i style="--c:var(--ink)"></i>gaidāms</span></div>
       <div id="dl-list"></div>
       <div id="hidden-box"></div>
     </section>
@@ -630,6 +640,11 @@ function rel(iso) {
   if (n === 1) return "rīt";
   return `pēc ${n} d.`;
 }
+function relFor(d) {
+  const n = dayDiff(d.due);
+  if (new Date(d.due) < new Date() && (d.done || !d.status)) return n === 0 ? "šodien" : `pirms ${-n} d.`;
+  return rel(d.due);
+}
 function ago(iso) {
   if (!iso) return "nekad";
   const m = Math.round((Date.now() - new Date(iso)) / 60000);
@@ -752,12 +767,14 @@ function dlRow(d) {
   const nf = relatedFiles(d).length;
   if (d.details || nf) body.append(el("button", { class: "linkish small-link", type: "button", onclick: () => openDeadline(d),
     text: [d.details ? "Pilns apraksts" : "", nf ? `${nf} ${nf === 1 ? "fails" : "faili"}` : ""].filter(Boolean).join(", ") }));
-  return el("div", { class: "dl" + (d.done ? " done" : "") + (guess ? " guess" : "") },
+  const overdue = !d.done && d.status && due < new Date();
+  const pastNoStatus = !d.done && !d.status && due < new Date();
+  return el("div", { class: "dl" + (d.done ? " done" : "") + (overdue ? " overdue" : "") + (pastNoStatus ? " past" : "") + (guess ? " guess" : "") },
     el("div", { class: "date" }, el("span", { class: "n", text: due.getDate() }),
       el("span", { class: "m", text: MON[due.getMonth()] })),
     body,
     el("div", { class: "side" },
-      el("div", { class: "rel" + (n <= 2 && !d.done && due > new Date() ? " soon" : ""), text: rel(d.due) }),
+      el("div", { class: "rel" + (n <= 2 && !d.done && due > new Date() ? " soon" : ""), text: relFor(d) }),
       el("div", { class: "muted", text: fmtDate(d.due) }), status));
 }
 function renderDeadlines() {
@@ -773,7 +790,7 @@ function renderDeadlines() {
     return;
   }
   const q = ui.q.toLowerCase(), now = new Date();
-  const items = allItems().filter(d => kindMatch(d) && (ui.showDone || !d.done)
+  const items = allItems().filter(d => kindMatch(d) && (ui.showDone || !d.done || (ui.showPast && new Date(d.due) < now))
     && (!q || `${d.title} ${d.course_full} ${d.course} ${d.section}`.toLowerCase().includes(q)));
   const past = allItems().filter(d => new Date(d.due) < now);
   const overdue = past.filter(d => !d.done && d.status).length;
@@ -787,7 +804,15 @@ function renderDeadlines() {
     ["Šomēnes", d => dayDiff(d.due) > 7 && dayDiff(d.due) <= 31],
     ["Vēlāk", d => dayDiff(d.due) > 31],
   ];
-  if (ui.showPast) groups.unshift(["Pagājušie", d => new Date(d.due) < now, false, true]);
+  if (ui.showPast) {
+    const MONTHS_FULL = ["Janvāris", "Februāris", "Marts", "Aprīlis", "Maijs", "Jūnijs", "Jūlijs", "Augusts", "Septembris", "Oktobris", "Novembris", "Decembris"];
+    const months = [...new Set(items.filter(d => new Date(d.due) < now).map(d => d.due.slice(0, 7)))].sort().reverse();
+    months.reverse().forEach(ym => {
+      const [y, m] = ym.split("-").map(Number);
+      groups.unshift([`Pagājušie: ${MONTHS_FULL[m - 1]}${y !== now.getFullYear() ? " " + y : ""}`,
+        d => new Date(d.due) < now && d.due.slice(0, 7) === ym, false, true]);
+    });
+  }
   const open = allItems().filter(d => !d.done && new Date(d.due) >= now && dayDiff(d.due) <= 7).length;
   $("#cnt-dl").textContent = open ? String(open) : "";
   let shown = 0;
@@ -954,7 +979,7 @@ function openDeadline(d) {
   const course = (VIEW.courses || []).find(c => c.id === d.course_id);
   const relLabel = { "tev": "tavai grupai" }[d.relevance] || d.relevance;
   const facts = el("dl", { class: "facts" },
-    el("dt", { text: "Termiņš" }), el("dd", {}, el("b", { text: fmtDate(d.due) }), ` (${rel(d.due)})`),
+    el("dt", { text: "Termiņš" }), el("dd", {}, el("b", { text: fmtDate(d.due) }), ` (${relFor(d)})`),
     d.start ? [el("dt", { text: "Atveras" }), el("dd", { text: fmtDate(d.start) })] : null,
     d.status ? [el("dt", { text: "Statuss" }), el("dd", { class: d.done ? "status ok" : "status todo", text: d.status })] : null,
     d.section ? [el("dt", { text: "Sadaļa" }), el("dd", { text: d.section })] : null,

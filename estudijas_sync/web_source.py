@@ -368,7 +368,7 @@ class WebSource:
         now = int(time.time())
         events, after = [], 0
         for _ in range(6):
-            args = {"timesortfrom": now - 14 * 86400, "timesortto": now + self.cfg.lookahead_days * 86400,
+            args = {"timesortfrom": now - self.cfg.lookback_days * 86400, "timesortto": now + self.cfg.lookahead_days * 86400,
                     "limitnum": 50, "limittononsuspendedevents": True}
             if after:
                 args["aftereventid"] = after

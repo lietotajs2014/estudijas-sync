@@ -10,7 +10,8 @@ Visu var darīt pārlūkā: Windows dubultklikšķis uz **`start.bat`** (macOS: 
 
 Panelī ir:
 - **Termiņi** — divu nedēļu laika ass un saraksts ar nākotnes termiņiem: šodien/rīt, šonedēļ, šomēnes, vēlāk.
-  - Pagājušie termiņi parādās tikai pēc pogas **"Rādīt pagājušos"**. Ja tur ir neiesniegts uzdevums, poga ir sarkana.
+  - Pagājušie termiņi parādās pēc pogas **"Rādīt pagājušos"**, grupēti pa mēnešiem, par visu semestri (`lookback_days`, noklusējums 200 dienas). Ja starp tiem ir neiesniegts uzdevums, poga ir sarkana.
+  - **Krāsas:** zaļš = iesniegts/izpildīts/novērtēts, sarkans = nokavēts (nav iesniegts), pelēks = pagājis (bez statusa), citādi pēc veida.
   - Uzklikšķinot uz termiņa (laika asī vai sarakstā), atveras logs ar pilno aprakstu, termiņu, statusu, sadaļu, saistītajiem failiem un pogām **"Atvērt estudijās"** un **"Atvērt kursu"**.
   - Filtri: KD, MD, testi, LD/PD, meklēšana. Citām grupām paslēptais ir saliktā sadaļā.
 - **Sinhronizēt tagad** ar progresa joslu un pēdējās sinhronizācijas laiku.
@@ -150,7 +151,13 @@ Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skri
    Panelī to pašu dara poga "Izvēlēties failu…".
    Konfigurācijā ieliec `[calendar] google = true`.
 
-Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Atgādinājumi tiek iestatīti 1 dienu un 2 h pirms termiņa (`reminders_minutes`).
+Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Tajā ir arī visi semestra pagājušie termiņi. Ieraksta krāsa mainās pēc statusa:
+- **zaļš** — iesniegts, izpildīts vai novērtēts (pie nosaukuma ✅);
+- **sarkans** — termiņš pagājis, nav iesniegts (⚠);
+- **pelēks** — pagājis notikums bez statusa;
+- gaidāmie: KD/eksāmeni violeti, MD zili, testi dzelteni, LD/PD tirkīza.
+
+Krāsa nomainās nākamajā sinhronizācijā pēc tam, kad statuss estudijās ir mainījies. Atgādinājumi tiek iestatīti 1 dienu un 2 h pirms termiņa (`reminders_minutes`).
 
 **Variants B: `termini.ics`.** Šo failu var importēt jebkurā kalendārā (Outlook, Apple), bet imports ir vienreizējs. Automātiskai atjaunināšanai izmanto variantu A.
 

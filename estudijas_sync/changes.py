@@ -11,7 +11,7 @@ from .model import Course, Deadline, TextBlock
 from .relevance import OTHER
 from .util import write_if_changed
 
-KIND_ICON = {"KD": "🟥", "Eksāmens": "🟥", "Tests": "🟧", "MD": "🟦", "LD": "🟩", "PD": "🟩"}
+KIND_ICON = {"KD": "🟪", "Eksāmens": "🟪", "Tests": "🟨", "MD": "🟦", "LD": "🟫", "PD": "🟫"}
 WEEKDAYS = ["P", "O", "T", "C", "Pk", "S", "Sv"]
 RUN_SEP = "\n<!-- palaišana -->\n"
 CHANGELOG = "JAUNUMI.md"

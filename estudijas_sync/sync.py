@@ -251,7 +251,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
 
     by_id = {c.id: c for c in courses}
     window = [d for d in result.deadlines.values()
-              if now - timedelta(days=21) <= d.due <= now + timedelta(days=cfg.lookahead_days)]
+              if now - timedelta(days=cfg.lookback_days) <= d.due <= now + timedelta(days=cfg.lookahead_days)]
     for d in window:
         m = matchers.get(d.course_id)
         if m:
@@ -352,7 +352,7 @@ def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, t
                report: dict, warnings: list[str], filter_desc: str, drive_copied: list[str], gcal_changes) -> None:
     """Dati web panelim (view.json profila mapē)."""
     import json
-    lo = now - timedelta(days=14)
+    lo = now - timedelta(days=cfg.lookback_days)
     view = {
         "generated": now.isoformat(timespec="seconds"),
         "user": info.get("fullname", ""),

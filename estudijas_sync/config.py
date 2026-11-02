@@ -69,6 +69,7 @@ class Config:
     download_max_mb: float = 200
     skip_extensions: list[str] = field(default_factory=list)
     lookahead_days: int = 150
+    lookback_days: int = 200
     notify: bool = True
     login_popup: bool = True
     schedule_times: list[str] = field(default_factory=lambda: ["07:30", "19:30"])
@@ -118,6 +119,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         download_max_mb=float(raw.get("download_max_mb", 200)),
         skip_extensions=[e.lower() for e in raw.get("skip_extensions", [])],
         lookahead_days=int(raw.get("lookahead_days", 150)),
+        lookback_days=int(raw.get("lookback_days", 200)),
         notify=bool(raw.get("notify", True)),
         login_popup=bool(raw.get("login_popup", True)),
         schedule_times=list(sched.get("times", ["07:30", "19:30"])),

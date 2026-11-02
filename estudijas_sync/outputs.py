@@ -9,7 +9,7 @@ from .model import Course, Deadline, Link, TextBlock
 from .util import md_escape, sanitize, write_if_changed
 
 WEEKDAYS = ["P", "O", "T", "C", "Pk", "S", "Sv"]
-KIND_ICON = {"KD": "🟥", "Eksāmens": "🟥", "Tests": "🟧", "MD": "🟦", "LD": "🟩", "PD": "🟩"}
+KIND_ICON = {"KD": "🟪", "Eksāmens": "🟪", "Tests": "🟨", "MD": "🟦", "LD": "🟫", "PD": "🟫"}
 BANNER_START, BANNER_END = "<!-- brīdinājums -->", "<!-- /brīdinājums -->"
 DIGEST_NAME = "UZDEVUMI.md"
 
@@ -35,9 +35,14 @@ def course_dir_name(c: Course, how: str) -> str:
     return sanitize(base, 80)
 
 
-def summary_line(d: Deadline, courses: dict[int, Course]) -> str:
+def is_overdue(d: Deadline, now: datetime | None = None) -> bool:
+    now = now or datetime.now(d.due.tzinfo)
+    return d.due < now and not d.done and d.status is not None
+
+
+def summary_line(d: Deadline, courses: dict[int, Course], now: datetime | None = None) -> str:
     c = courses.get(d.course_id)
-    prefix = "✅ " if d.done else ("❓ " if d.source == "teksts" else "")
+    prefix = ("✅ " if d.done else "⚠ " if is_overdue(d, now) else "❓ " if d.source == "teksts" else "")
     label = f"{c.label}: " if c else ""
     return f"{prefix}[{d.kind}] {label}{d.title}"
 
@@ -266,7 +271,7 @@ def write_ics(path: Path, deadlines: list[Deadline], courses: dict[int, Course],
                   f"DESCRIPTION:{_ics_escape(event_description(d, courses))}"]
         if d.url:
             lines.append(f"URL:{d.url}")
-        if not d.done:
+        if not d.done and d.due > datetime.now(d.due.tzinfo):
             for m in reminders:
                 lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_escape(d.title)}",
                           f"TRIGGER:-PT{int(m)}M", "END:VALARM"]

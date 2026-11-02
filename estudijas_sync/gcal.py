@@ -12,7 +12,19 @@ from .outputs import event_description, event_span, summary_line
 
 log = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-COLORS = {"KD": "11", "Eksāmens": "11", "Tests": "6", "MD": "9", "LD": "10", "PD": "10"}
+# Google Calendar krāsas: 10 zaļa (Basil), 11 sarkana (Tomato), 8 pelēka (Graphite), 3 violeta (Grape),
+# 9 zila (Blueberry), 5 dzeltena (Banana), 7 tirkīza (Peacock)
+COLOR_DONE, COLOR_OVERDUE, COLOR_PAST = "10", "11", "8"
+KIND_COLORS = {"KD": "3", "Eksāmens": "3", "Tests": "5", "MD": "9", "LD": "7", "PD": "7"}
+
+
+def color_for(d: Deadline, now: datetime) -> str | None:
+    """Krāsa pēc stāvokļa: iesniegts → zaļš, nokavēts → sarkans, pagājis → pelēks, citādi pēc veida."""
+    if d.done:
+        return COLOR_DONE
+    if d.due < now:
+        return COLOR_OVERDUE if d.status is not None else COLOR_PAST
+    return KIND_COLORS.get(d.kind)
 
 
 class GCalNotAuthorized(Exception):
@@ -131,21 +143,39 @@ def _event_id(uid: str) -> str:
     return "rtu" + hashlib.sha1(uid.encode()).hexdigest()  # tikai 0-9 a-v simboli
 
 
-def _body(d: Deadline, courses: dict[int, Course], cfg: Config) -> dict:
+def _body(d: Deadline, courses: dict[int, Course], cfg: Config, now: datetime) -> dict:
     s, e = event_span(d)
+    future = d.due > now
     body = {
-        "summary": summary_line(d, courses),
+        "summary": summary_line(d, courses, now),
         "description": event_description(d, courses),
         "start": {"dateTime": s.isoformat(), "timeZone": cfg.timezone},
         "end": {"dateTime": e.isoformat(), "timeZone": cfg.timezone},
-        "reminders": {"useDefault": False, "overrides": [] if d.done else
+        "reminders": {"useDefault": False, "overrides": [] if d.done or not future else
                       [{"method": "popup", "minutes": m} for m in cfg.reminders_minutes]},
         "status": "confirmed",
         "source": {"title": "estudijas.rtu.lv", "url": d.url} if d.url.startswith("http") else None,
     }
-    if d.kind in COLORS:
-        body["colorId"] = COLORS[d.kind]
+    color = color_for(d, now)
+    if color:
+        body["colorId"] = color
     return {k: v for k, v in body.items() if v is not None}
+
+
+def _execute(req, tries: int = 4):
+    """Izpilda Google pieprasījumu; ja pārsniegts ātruma limits, pagaida un mēģina vēlreiz."""
+    import time
+    from googleapiclient.errors import HttpError
+    for i in range(tries):
+        try:
+            return req.execute()
+        except HttpError as e:
+            text = str(e)
+            if e.resp.status in (403, 429) and ("rateLimit" in text or "RateLimit" in text or e.resp.status == 429) \
+                    and i < tries - 1:
+                time.sleep(2 ** i)
+                continue
+            raise
 
 
 def sync(cfg: Config, state: State, deadlines: list[Deadline], courses: dict[int, Course], now: datetime) -> int:
@@ -157,20 +187,18 @@ def sync(cfg: Config, state: State, deadlines: list[Deadline], courses: dict[int
     current: dict[str, dict] = {}
     changed = 0
     for d in deadlines:
-        if d.due < now - timedelta(days=2):
-            continue
         eid = _event_id(d.uid)
-        body = _body(d, courses, cfg)
+        body = _body(d, courses, cfg, now)
         h = hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         current[eid] = {"due": d.due.isoformat(), "hash": h}
         if synced.get(eid, {}).get("hash") == h:
             continue
         try:
-            svc.events().update(calendarId=cid, eventId=eid, body=body).execute()
+            _execute(svc.events().update(calendarId=cid, eventId=eid, body=body))
         except HttpError as e:
             if e.resp.status != 404:
                 raise
-            svc.events().insert(calendarId=cid, body={**body, "id": eid}).execute()
+            _execute(svc.events().insert(calendarId=cid, body={**body, "id": eid}))
         changed += 1
     # Nākotnes notikumi, kas vairs neeksistē (piem., pasniedzējs izdzēsa) — dzēš
     for eid, meta in list(synced.items()):
