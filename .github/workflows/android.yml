@@ -29,7 +29,10 @@ jobs:
           node-version: "22"
 
       - name: Loģikas testi
-        run: node android/test/logic.test.js
+        working-directory: android/test
+        run: |
+          npm ci --no-audit --no-fund
+          node logic.test.js
 
       - uses: gradle/actions/setup-gradle@v5
 

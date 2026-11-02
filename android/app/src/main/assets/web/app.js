@@ -26,11 +26,12 @@ function el(tag, attrs = {}, ...kids) {
 /* ---------- tilts ar Android (pārlūkā — rezerves varianti testēšanai) ---------- */
 const pending = new Map();
 let reqSeq = 0;
-window.__nativeResult = (id, status, text) => { const p = pending.get(id); if (p) { pending.delete(id); p({ status, text }); } };
+window.__nativeResult = (id, status, text, location) => { const p = pending.get(id); if (p) { pending.delete(id); p({ status, text, location: location || "" }); } };
 function http(method, url, body, ctype) {
   if (N) return new Promise(res => { const id = "r" + (++reqSeq); pending.set(id, res); N.request(id, method, url, body || "", ctype || ""); });
   if (window.__fakeHttp) return window.__fakeHttp(method, url, body, ctype);
-  return fetch(url, { method, body, headers: ctype ? { "Content-Type": ctype } : {} }).then(async r => ({ status: r.status, text: await r.text() }));
+  return fetch(url, { method, body, credentials: "include", headers: ctype ? { "Content-Type": ctype } : {} })
+    .then(async r => ({ status: r.status, text: await r.text(), location: "" }), e => ({ status: 0, text: String(e) }));
 }
 const store = {
   get(k) { try { const v = N ? N.load(k) : localStorage.getItem("es." + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
@@ -46,7 +47,7 @@ function toast(msg, bad = false) {
 
 /* ---------- stāvoklis ---------- */
 const S = {
-  auth: store.get("auth"),            // {token, privatetoken}
+  auth: store.get("auth"),            // {ok, at} — sesija pati ir lietotnes sīkdatnēs
   settings: Object.assign({ program: "", group: "", other: false, auto: true, email: "" }, store.get("settings") || {}),
   view: store.get("view"),
   news: store.get("news"),
@@ -85,29 +86,10 @@ function statusBadge(d, now = Date.now()) {
 }
 const kindColor = k => KIND[k] || "var(--muted)";
 
-/* ---------- Moodle saites ---------- */
-function fileHref(f) {
-  if (f.link) return f.link;
-  if (!f.fileurl || !S.auth) return f.page_url;
-  let url = f.fileurl.replace(/([?&])forcedownload=1&?/, "$1").replace(/[?&]$/, "");
-  return new Logic.Moodle(SITE, S.auth.token).fileUrl(url);
-}
-let lastAutologin = 0;
-async function openPage(url) {
-  // Mēģina atvērt estudiju lapu pārlūkā jau ielogotu (Moodle autologin, ne biežāk kā reizi 6 min.)
-  if (!url) return;
-  if (S.auth && S.auth.privatetoken && Date.now() - lastAutologin > 6.5 * 6e4 && url.startsWith(SITE)) {
-    lastAutologin = Date.now();
-    try {
-      const api = new Logic.Moodle(SITE, S.auth.token, http);
-      const r = await api.call("tool_mobile_get_autologin_key", { privatetoken: S.auth.privatetoken });
-      if (r && r.key && r.autologinurl && S.view) {
-        return openUrl(`${r.autologinurl}?userid=${S.view.userid}&key=${encodeURIComponent(r.key)}&urltogo=${encodeURIComponent(url)}`);
-      }
-    } catch (e) { /* atver parasti */ }
-  }
-  openUrl(url);
-}
+/* ---------- saites: viss atveras pārlūkā ---------- */
+// resurss → mod/resource/view.php (pārlūks pāradresē uz dokumentu); mapes/uzdevumu pielikumi → tiešā faila saite
+const fileHref = f => f.link || f.fileurl || f.page_url;
+const openPage = url => openUrl(url);
 
 /* ---------- sinhronizācija ---------- */
 function setProgress(text, frac) {
@@ -122,8 +104,9 @@ async function runSync(manual) {
   $("#btn-sync").classList.add("spin"); $("#btn-sync").disabled = true;
   setProgress("Sāk…", 0);
   try {
-    const view = await Logic.sync({ site: SITE, token: S.auth.token, http, program: S.settings.program, group: S.settings.group,
-      otherGroups: S.settings.other ? "keep" : "skip", progress: setProgress });
+    const view = await Logic.sync({ site: SITE, http, program: S.settings.program, group: S.settings.group,
+      otherGroups: S.settings.other ? "keep" : "skip", progress: setProgress, prev: S.view });
+    S.reloginTried = false;
     const df = Logic.diff(S.view, view);
     if (!df.first && df.items.length) { S.news = { at: view.generated, items: df.items }; store.set("news", S.news); }
     S.view = view; store.set("view", view);
@@ -131,8 +114,9 @@ async function runSync(manual) {
     if (manual) toast(df.items.length && !df.first ? `Ir jaunumi: ${df.items.length}` : "Sinhronizēts");
   } catch (e) {
     if (e && e.code === "login") {
-      toast("Piekļuve beigusies — pieslēdzies no jauna.", true);
-      S.auth = null; store.set("auth", null); render(); showTab("settings");
+      // sesija beigusies: atver pieteikšanos (bieži tā pabeidzas pati, jo Microsoft atceras kontu)
+      if (!S.reloginTried && N) { S.reloginTried = true; toast("Estudiju sesija beigusies — atveras pieslēgšanās…"); setTimeout(login, 300); }
+      else { toast("Jāpieslēdzas no jauna.", true); S.auth = null; store.set("auth", null); render(); showTab("settings"); }
     } else toast("Neizdevās: " + (e && e.message || e) + (navigator.onLine === false ? " (nav interneta)" : ""), true);
   } finally {
     S.syncing = false; setProgress(null);
@@ -141,27 +125,13 @@ async function runSync(manual) {
 }
 
 /* ---------- pieteikšanās ---------- */
-let loginPending = 0;
-function login(mode) {
-  mode = mode === "app" ? "app" : "browser";
-  if (!N) { const t = prompt("Moodle tokens (testēšanai pārlūkā):"); if (t) window.__onLogin(t, ""); return; }
-  loginPending = mode === "browser" ? Date.now() : 0;
-  N.login(S.settings.email || "", mode);
+function login() {
+  if (!N) { window.__onLogin(true); return; }        // pārlūka testam
+  N.login(S.settings.email || "");
 }
-// Atgriežoties no pārlūka bez žetona (piem., pēc pieteikšanās atvērās estudiju sākumlapa)
-function loginNotFinished() {
-  openSheet(el("span", { class: "kind", style: "--c:var(--warn)", text: "Pieslēgšanās" }), "Pieslēgšanās nav pabeigta", [
-    el("p", { text: "Ja pārlūkā jau ielogojies un redzēji estudiju lapu, spied “Pabeigt pieslēgšanos” — pārlūks uzreiz atgriezīsies lietotnē." }),
-    el("div", { class: "btns" },
-      el("button", { class: "btn", type: "button", text: "Pabeigt pieslēgšanos", onclick: () => { closeSheet(); login("browser"); } }),
-      el("button", { class: "btn ghost", type: "button", text: "Atcelt", onclick: () => { loginPending = 0; closeSheet(); } })),
-    el("p", { class: "small muted" }, "Neizdodas? ",
-      el("a", { href: "#", text: "Pieslēgties lietotnes iekšienē", onclick: e => { e.preventDefault(); closeSheet(); login("app"); } }))]);
-}
-window.__onLogin = (token, privatetoken, err) => {
-  loginPending = 0;
-  if (!token) { if (err) toast(err, true); return; }
-  S.auth = { token, privatetoken: privatetoken || "" };
+window.__onLogin = (ok, err) => {
+  if (!ok) { if (err) toast(err, true); S.reloginTried = false; return; }
+  S.auth = { ok: true, at: Date.now() };
   store.set("auth", S.auth);
   render(); showTab("deadlines");
   runSync(true);
@@ -330,11 +300,11 @@ function renderConsult() {
 /* ---------- faili ---------- */
 function fileRow(f) {
   const dl = f.deadline_uid ? S.view.deadlines.find(d => d.uid === f.deadline_uid) : null;
-  const ext = f.modtype === "url" ? "saite" : ((f.filename.match(/\.([a-z0-9]{1,5})$/i) || [])[1] || "fails");
+  const ext = f.modtype === "url" ? "saite" : (f.ftype || (f.filename.match(/\.([a-z0-9]{1,5})$/i) || [])[1] || "fails");
   return el("button", { type: "button", class: "file", onclick: () => openFile(f) },
     el("span", { class: "ext", text: ext }),
     el("span", { class: "main" }, el("span", { class: "t", text: f.filename }),
-      el("span", { class: "meta", text: [f.category, f.module !== f.filename ? f.module : "", f.created ? "ielikts " + fmtDate(f.created * 1000) : "", sizeStr(f.size)].filter(Boolean).join(" · ") }),
+      el("span", { class: "meta", text: [f.category, f.module !== f.filename ? f.module : "", f.subpath || "", f.created ? "ielikts " + fmtDate(f.created * 1000) : "", f.details || sizeStr(f.size)].filter(Boolean).join(" · ") }),
       dl ? el("span", { class: "meta" }, el("span", { class: "dl-link", style: `--c:${kindColor(dl.kind)}`, text: `${dl.kind} līdz ${fmtDate(dl.due)} ${fmtTime(dl.due)}` })) : null));
 }
 function openFile(f) {
@@ -345,7 +315,7 @@ function openFile(f) {
   if (dl) body.push(el("p", {}, "Pie termiņa: ", el("a", { href: "#", onclick: e => { e.preventDefault(); closeSheet(); openDeadline(dl); }, text: `${dl.title} (${fmtDate(dl.due)})` })));
   body.push(el("div", { class: "btns" },
     el("button", { class: "btn", type: "button", text: f.modtype === "url" ? "Atvērt saiti" : "Atvērt dokumentu", onclick: () => { openUrl(fileHref(f)); closeSheet(); } }),
-    f.page_url ? el("button", { class: "btn ghost", type: "button", text: "Lapa estudijās", onclick: () => openPage(f.page_url) }) : null));
+    f.page_url && f.page_url !== fileHref(f) ? el("button", { class: "btn ghost", type: "button", text: "Lapa estudijās", onclick: () => openPage(f.page_url) }) : null));
   body.push(el("p", { class: "small muted", text: "Dokuments atveras pārlūkā vai tam piemērotā lietotnē (PDF, Word, PowerPoint)." }));
   openSheet(el("span", { class: "kind", style: "--c:var(--ink-soft)", text: f.modtype === "url" ? "Saite" : "Fails" }), f.module || f.filename, body);
 }
@@ -363,7 +333,7 @@ function renderFiles() {
   const box = $("#files-list"); box.replaceChildren();
   if (!list.length) { box.append(el("p", { class: "empty", text: "Nav failu ar šādiem filtriem." })); return; }
   if (f.sort === "new") {
-    list.sort((a, b) => (b.created || 0) - (a.created || 0));
+    list.sort((a, b) => (b.created || 0) - (a.created || 0) || (b.seq || 0) - (a.seq || 0));
     box.append(...list.slice(0, 300).map(fileRow));
     return;
   }
@@ -371,7 +341,7 @@ function renderFiles() {
   for (const x of list) { if (!byCourse.has(x.course_id)) byCourse.set(x.course_id, []); byCourse.get(x.course_id).push(x); }
   for (const c of v.courses) {
     const fs = byCourse.get(c.id); if (!fs) continue;
-    fs.sort((a, b) => upcoming(a) - upcoming(b) || (b.created || 0) - (a.created || 0));
+    fs.sort((a, b) => upcoming(a) - upcoming(b) || (b.created || 0) - (a.created || 0) || (b.seq || 0) - (a.seq || 0));
     box.append(el("div", { class: "course-h", text: c.full || c.label }), ...fs.map(fileRow));
   }
 }
@@ -386,9 +356,9 @@ function renderSettings() {
   acc.replaceChildren(el("h3", { text: "Konts" }));
   if (S.auth) {
     acc.append(el("p", {}, "Pieslēdzies kā ", el("b", { text: (S.view && S.view.user) || "…" })),
-      el("div", { class: "btns" }, el("button", { class: "btn ghost", type: "button", onclick: () => login("browser"), text: "Pieslēgties no jauna" }),
+      el("div", { class: "btns" }, el("button", { class: "btn ghost", type: "button", onclick: login, text: "Pieslēgties no jauna" }),
         el("button", { class: "btn danger", type: "button", onclick: () => { if (confirm("Atslēgties un izdzēst datus no šī telefona?")) logout(); }, text: "Atslēgties" })));
-  } else acc.append(el("button", { class: "btn wide", type: "button", onclick: () => login("browser"), text: "Pieslēgties" }));
+  } else acc.append(el("button", { class: "btn wide", type: "button", onclick: login, text: "Pieslēgties" }));
   $("#version").textContent = "Versija " + (N && N.version ? N.version() : "web");
   const w = (S.view && S.view.warnings) || [];
   $("#warnings").replaceChildren(...(w.length ? [el("div", { class: "warn-box" }, el("b", { text: "Pēdējā sinhronizācijā: " }), w.join("; "))] : []));
@@ -413,14 +383,12 @@ window.__onBack = () => {           // Android "atpakaļ" poga: true — apstrā
   return false;
 };
 window.__onResume = () => {
-  if (loginPending && Date.now() - loginPending > 1500 && Date.now() - loginPending < 30 * 6e4) loginNotFinished();
   if (S.view) $("#stamp").textContent = `Sinhronizēts ${ago(S.view.generated)}` + (S.view.filter ? ` · ${S.view.filter}` : ""); autoSync(); };
 function autoSync() { if (S.auth && S.settings.auto !== false && (!S.view || Date.now() - S.view.generated > 30 * 6e4)) runSync(false); }
 
 /* ---------- notikumi ---------- */
 $("#btn-sync").addEventListener("click", () => runSync(true));
-$("#btn-login").addEventListener("click", () => { saveSettings("w"); login("browser"); });
-$("#btn-login-app").addEventListener("click", e => { e.preventDefault(); saveSettings("w"); login("app"); });
+$("#btn-login").addEventListener("click", () => { saveSettings("w"); login(); });
 $("#btn-save").addEventListener("click", () => { saveSettings("s"); toast("Saglabāts"); runSync(true); });
 $("#btn-past").addEventListener("click", () => { S.dl.past = !S.dl.past; renderDeadlines(); });
 $("#f-course").addEventListener("change", e => { S.dl.course = e.target.value; renderDeadlines(); });

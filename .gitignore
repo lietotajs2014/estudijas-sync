@@ -31,3 +31,4 @@ android/keystore.properties
 *.keystore
 *.apk
 .idea/
+android/test/node_modules/

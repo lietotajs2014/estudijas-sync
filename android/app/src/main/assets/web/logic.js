@@ -1,24 +1,10 @@
 /* estudijas-sync Android: sinhronizācijas loģika (darbojas WebView un Node testos).
- * Saturs no estudijām caur Moodle mobilās lietotnes API. Faili netiek lejupielādēti —
- * tiek saglabātas tikai saites, lai tos atvērtu pārlūkā. */
+ * RTU estudijās mobilā API ir izslēgta, tāpēc dati tiek nolasīti ar lietotnē ielogotu pārlūka sesiju
+ * (kursu lapas + estudiju AJAX). Faili netiek lejupielādēti — tiek saglabātas tikai saites. */
 (function (root) {
   "use strict";
 
   /* ---------- palīgi ---------- */
-  function flatten(params, prefix, out) {
-    out = out || [];
-    for (const [k, v] of Object.entries(params || {})) {
-      const key = prefix ? `${prefix}[${k}]` : k;
-      if (v === null || v === undefined) continue;
-      if (Array.isArray(v)) v.forEach((x, i) => (x && typeof x === "object") ? flatten(x, `${key}[${i}]`, out) : out.push([`${key}[${i}]`, typeof x === "boolean" ? +x : x]));
-      else if (typeof v === "object") flatten(v, key, out);
-      else out.push([key, typeof v === "boolean" ? +v : v]);
-    }
-    return out;
-  }
-  function encodeForm(pairs) {
-    return pairs.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`).join("&");
-  }
   const ENT = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
   function htmlToText(html) {
     if (!html) return "";
@@ -42,36 +28,99 @@
   }
   async function pool(items, n, fn) {
     const res = new Array(items.length);
-    let i = 0;
+    let i = 0, loginErr = null;
     const workers = Array.from({ length: Math.min(n, items.length) }, async () => {
-      while (i < items.length) { const k = i++; try { res[k] = await fn(items[k], k); } catch (e) { res[k] = e; } }
+      while (i < items.length) {
+        const k = i++;
+        try { res[k] = await fn(items[k], k); } catch (e) { res[k] = e; if (e && e.code === "login") { loginErr = e; i = items.length; } }
+      }
     });
     await Promise.all(workers);
+    if (loginErr) throw loginErr;   // sesija beigusies — pārtrauc visu
     return res;
   }
 
-  /* ---------- Moodle API ---------- */
+  /* ---------- Moodle: pārlūka sesija (RTU mobilā API ir izslēgta) ---------- */
   class MoodleError extends Error { constructor(msg, code) { super(msg); this.code = code; } }
+  const LOGIN_RE = /\/login\/|login\.microsoftonline\.com|\/auth\/|microsoftonline/i;
   class Moodle {
-    constructor(site, token, http) { this.site = site.replace(/\/$/, ""); this.token = token; this.http = http; }
-    async call(fn, params) {
-      const body = encodeForm([...flatten(params), ["wstoken", this.token], ["wsfunction", fn], ["moodlewsrestformat", "json"]]);
-      const r = await this.http("POST", `${this.site}/webservice/rest/server.php`, body, "application/x-www-form-urlencoded");
+    constructor(site, http, DOMParserImpl) {
+      this.site = site.replace(/\/$/, ""); this.http = http; this.sesskey = "";
+      this.DP = DOMParserImpl;
+    }
+    abs(u) { if (!u) return ""; try { return new URL(u, this.site + "/").href; } catch (e) { return ""; } }
+    /** GET ar pāradresāciju sekošanu (tikai estudijās); pieteikšanās lapa → "login" kļūda. */
+    async get(url) {
+      url = this.abs(url);
+      for (let hop = 0; hop < 6; hop++) {
+        const r = await this.http("GET", url, "", "");
+        if (!r.status) throw new MoodleError(`Nav savienojuma ar estudijām (${r.text || "tīkls"})`, "network");
+        if (r.status >= 300 && r.status < 400 && r.location) {
+          const next = this.abs(r.location);
+          if (LOGIN_RE.test(next) || !next.startsWith(this.site)) {
+            if (LOGIN_RE.test(next)) throw new MoodleError("Jāpiesakās no jauna", "login");
+            return { url: next, status: r.status, text: "", external: true };
+          }
+          url = next; continue;
+        }
+        if (r.status >= 400) throw new MoodleError(`HTTP ${r.status}: ${url.replace(this.site, "")}`, "http");
+        if (/\/login\/index\.php/.test(url) || /<form[^>]+id="login"/.test(r.text)) throw new MoodleError("Jāpiesakās no jauna", "login");
+        return { url, status: r.status, text: r.text };
+      }
+      throw new MoodleError("Pārāk daudz pāradresāciju", "http");
+    }
+    async doc(url) {
+      const r = await this.get(url);
+      const d = new this.DP().parseFromString(r.text || "", "text/html");
+      d.__url = r.url;
+      return d;
+    }
+    /** Atver /my/ un nolasa sesskey un lietotāju. */
+    async start() {
+      const r = await this.get(this.site + "/my/");
+      const m = /"sesskey":"([^"]+)"/.exec(r.text);
+      if (!m) throw new MoodleError("Jāpiesakās no jauna", "login");
+      this.sesskey = m[1];
+      const d = new this.DP().parseFromString(r.text, "text/html");
+      const nameEl = d.querySelector(".usermenu .usertext, .userbutton .usertext, .logininfo a[href*='user/profile.php'], #usernavigation .usertext, .user-name, .myprofileitem.fullname");
+      const uid = d.querySelector("[data-userid]");
+      return { fullname: nameEl ? cleanText(nameEl.textContent) : "", userid: uid ? uid.getAttribute("data-userid") : null };
+    }
+    async call(fn, args) {
+      const r = await this.http("POST", `${this.site}/lib/ajax/service.php?sesskey=${encodeURIComponent(this.sesskey)}&info=${fn}`,
+        JSON.stringify([{ index: 0, methodname: fn, args: args || {} }]), "application/json");
       if (!r.status) throw new MoodleError(`Nav savienojuma ar estudijām (${r.text || "tīkls"})`, "network");
-      if (r.status >= 400) throw new MoodleError(`HTTP ${r.status}`, "http");
+      if (r.status >= 300 && r.status < 400) throw new MoodleError("Jāpiesakās no jauna", "login");
       let j;
       try { j = JSON.parse(r.text); } catch (e) { throw new MoodleError("Nesaprotama atbilde no estudijām", "parse"); }
-      if (j && typeof j === "object" && !Array.isArray(j) && j.exception) {
-        if (["invalidtoken", "invalidtimedtoken", "expiredtoken"].includes(j.errorcode)) throw new MoodleError("Jāpiesakās no jauna", "login");
-        throw new MoodleError(`${fn}: ${j.message}`, j.errorcode);
+      const bad = ["servicerequireslogin", "invalidsesskey", "requireloginerror"];
+      if (j && !Array.isArray(j)) {
+        const ex = j.exception || j;
+        if (bad.includes(ex.errorcode)) throw new MoodleError("Jāpiesakās no jauna", "login");
+        throw new MoodleError(`${fn}: ${ex.message || "kļūda"}`, ex.errorcode);
       }
-      return j;
+      const it = j[0] || {};
+      if (it.error) {
+        const ex = it.exception || {};
+        if (bad.includes(ex.errorcode)) throw new MoodleError("Jāpiesakās no jauna", "login");
+        throw new MoodleError(`${fn}: ${ex.message || "kļūda"}`, ex.errorcode);
+      }
+      return it.data;
     }
-    fileUrl(url) {
-      if (!url) return "";
-      if (!url.includes("/webservice/pluginfile.php") && url.includes("/pluginfile.php")) url = url.replace("/pluginfile.php", "/webservice/pluginfile.php");
-      return url + (url.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(this.token);
-    }
+  }
+  const cleanText = s => String(s || "").replace(/\s+/g, " ").trim();
+  function cleanName(el) {
+    if (!el) return "";
+    const c = el.cloneNode(true);
+    c.querySelectorAll(".accesshide, .sr-only, .visually-hidden").forEach(x => x.remove());
+    return cleanText(c.textContent);
+  }
+  const elText = el => el ? htmlToText(el.innerHTML) : "";
+  const FTYPES = { pdf: "pdf", document: "doc", powerpoint: "ppt", spreadsheet: "xls", archive: "zip", image: "attēls", text: "txt",
+    video: "video", audio: "audio", sourcecode: "kods", markup: "html", calc: "xls", impress: "ppt", writer: "doc", unknown: "fails" };
+  function ftypeFromIcon(src) {
+    const m = /\/f\/([a-z]+)/.exec(src || "");
+    return m ? (FTYPES[m[1]] || m[1]) : "";
   }
 
   /* ---------- klasifikācija ---------- */
@@ -209,161 +258,215 @@
   }
 
   /* ---------- sinhronizācija ---------- */
-  const STATUS_LV = { submitted: "iesniegts", draft: "melnraksts (nav iesniegts!)", new: "nav iesniegts", reopened: "atvērts atkārtoti", "": "nav iesniegts" };
   const isDone = s => /^(iesniegts|izpildīts|novērtēts)/i.test(s || "");
+  const CMID = u => { const m = /\/mod\/(\w+)\/view\.php\?(?:[^#]*&)?id=(\d+)/.exec(u || ""); return m ? { mod: m[1], cmid: m[2] } : null; };
+
+  function parseSections(doc, M) {
+    const out = [];
+    doc.querySelectorAll("li.section, li.course-section").forEach((li, i) => {
+      let num = li.getAttribute("data-number") ?? li.getAttribute("data-sectionnum");
+      if (num == null) { const m = /section-(\d+)/.exec(li.id || ""); num = m ? m[1] : i; }
+      const name = cleanText(li.getAttribute("data-sectionname") || cleanName(li.querySelector(".sectionname, h3.section-title, h3")) || `Sadaļa ${num}`);
+      const summ = li.querySelector(".summarytext, .summary");
+      const acts = [];
+      li.querySelectorAll("li.activity").forEach(a => {
+        const cls = [...a.classList], modtype = (cls.find(c => c.startsWith("modtype_")) || "").slice(8);
+        const link = a.querySelector("a.aalink, .activityname a, .activityinstance a");
+        const icon = a.querySelector("img.activityicon, img.iconlarge, .activityiconcontainer img, img.icon");
+        const textEl = a.querySelector(".activity-altcontent, .contentwithoutlink, .description, .activity-description");
+        acts.push({ cmid: a.getAttribute("data-id") || ((/module-(\d+)/.exec(a.id || "") || [])[1]) || "", modtype,
+          name: cleanName(a.querySelector(".instancename") || link), url: link ? M.abs(link.getAttribute("href")) : "",
+          ftype: ftypeFromIcon(icon && icon.getAttribute("src")), text: elText(textEl),
+          details: cleanText((a.querySelector(".resourcelinkdetails") || {}).textContent || "") });
+      });
+      out.push({ num: +num || 0, name, summary: elText(summ), acts });
+    });
+    return out;
+  }
+  function pluginfileName(href) {
+    try { return decodeURIComponent(new URL(href).pathname.split("/").pop()); } catch (e) { return href.split("/").pop(); }
+  }
 
   async function sync(opts) {
-    const { site, token, http, program, group, otherGroups = "skip", progress = () => {} } = opts;
-    const api = new Moodle(site, token, http);
-    const now = Date.now(), ts = t => t ? t * 1000 : null;
-    const warnings = [];
+    const { site, http, program, group, otherGroups = "skip", progress = () => {}, prev = null } = opts;
+    const DP = opts.DOMParser || root.DOMParser;
+    const M = new Moodle(site, http, DP);
+    const now = Date.now(), warnings = [];
+    const prevDl = new Map(((prev && prev.deadlines) || []).concat((prev && prev.hidden) || []).map(d => [d.uid, d]));
+    const prevFiles = (prev && prev.files) || [];
     progress("Pieslēdzas estudijām…", 0);
-    const info = await api.call("core_webservice_get_site_info");
-    const res = await api.call("core_course_get_enrolled_courses_by_timeline_classification", { classification: "inprogress", limit: 0, offset: 0, sort: "fullname" });
-    const courses = (res.courses || []).map(c => ({ id: +c.id, short: c.shortname || "", full: c.fullname || "", url: c.viewurl || `${api.site}/course/view.php?id=${c.id}` }))
+    const info = await M.start();
+    const res = await M.call("core_course_get_enrolled_courses_by_timeline_classification", { classification: "inprogress", limit: 0, offset: 0, sort: "fullname" });
+    const courses = (res.courses || []).map(c => ({ id: +c.id, short: c.shortname || "", full: c.fullname || "", url: c.viewurl || `${M.site}/course/view.php?id=${c.id}` }))
       .map(c => ({ ...c, label: c.short && c.short.length <= 18 ? c.short : (c.full.length > 28 ? c.full.slice(0, 27) + "…" : c.full) }));
     const byId = new Map(courses.map(c => [c.id, c]));
-    const ids = courses.map(c => c.id);
-    const files = [], texts = [], cmSection = new Map(), groups = new Map(), deadlines = new Map();
-    const add = d => { const o = deadlines.get(d.uid); if (!o) deadlines.set(d.uid, d); else for (const k of ["start", "url", "status", "details", "section"]) if (!o[k] && d[k]) o[k] = d[k]; };
+    const steps = courses.length * 2 + 3;
+    let step = 0;
+    const tick = label => progress(label, Math.min(0.99, ++step / steps));
 
-    let done = 0;
-    await pool(courses, 4, async c => {
+    // 1) kalendārs: termiņi un notikumi ±6 mēneši (datumi no estudiju kalendāra)
+    const events = new Map();
+    const months = [];
+    for (let k = -6; k <= 6; k++) { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); months.push([d.getFullYear(), d.getMonth() + 1]); }
+    await pool(months, 3, async ([year, month]) => {
       try {
-        const secs = await api.call("core_course_get_contents", { courseid: c.id });
-        secs.forEach((sec, idx) => {
-          const secnum = +(sec.section ?? idx), secname = (sec.name || `Sadaļa ${secnum}`).trim();
-          const summary = htmlToText(sec.summary);
-          if (summary) texts.push({ course_id: c.id, title: secname, text: summary, url: c.url });
-          for (const m of sec.modules || []) {
-            if (m.uservisible === false) continue;
-            cmSection.set(+m.id, secname);
-            const desc = htmlToText(m.description);
-            if (m.modname === "label") { if (desc) texts.push({ course_id: c.id, title: secname, text: desc, url: c.url }); continue; }
-            if (desc && !["assign", "quiz"].includes(m.modname)) texts.push({ course_id: c.id, title: `${secname} — ${m.name}`, text: desc, url: m.url || c.url });
-            if (["resource", "folder"].includes(m.modname)) {
-              for (const f of m.contents || []) {
-                if (f.type !== "file") continue;
-                files.push({ course_id: c.id, section: secname, section_num: secnum, module: (m.name || "").trim(), modtype: m.modname,
-                  filename: f.filename, subpath: m.modname === "folder" ? (f.filepath || "/").replace(/^\/|\/$/g, "") : "",
-                  fileurl: f.fileurl, cmid: String(m.id), size: f.filesize || null, created: f.timecreated || f.timemodified || null,
-                  page_url: m.url || "" });
-              }
-            } else if (m.modname === "url") {
-              for (const f of m.contents || []) if (f.type === "url" && f.fileurl)
-                files.push({ course_id: c.id, section: secname, section_num: secnum, module: m.name, modtype: "url", filename: m.name,
-                  fileurl: "", link: f.fileurl, cmid: String(m.id), created: f.timecreated || null, page_url: m.url || "" });
-            }
+        const v = await M.call("core_calendar_get_calendar_monthly_view", { year, month, courseid: 1, categoryid: 0, includenavigation: false, mini: true, day: 1 });
+        for (const w of (v && v.weeks) || []) for (const day of w.days || []) for (const e of day.events || []) events.set(e.id, e);
+      } catch (e) { if (e.code === "login") throw e; warnings.push(`kalendārs ${month}.: ${e.message}`); }
+    });
+    tick("Kalendārs");
+    const deadlines = new Map(), starts = new Map(), consultEvents = [];
+    for (const e of events.values()) {
+      const cid = +((e.course && e.course.id) || e.courseid || 0);
+      if (cid > 1 && !byId.has(cid)) continue;
+      const name = cleanText(e.activityname || e.name), url = e.url || e.viewurl || "", cm = CMID(url);
+      const t = (e.timesort || e.timestart) * 1000;
+      if (cm && e.modulename) {
+        const uid = `cm-${cm.cmid}`;
+        if (e.eventtype === "open") { starts.set(uid, e.timestart * 1000); continue; }
+        if (e.eventtype === "gradingdue") continue;
+        const o = deadlines.get(uid);
+        if (o && o.due >= t) continue;
+        deadlines.set(uid, { uid, cmid: cm.cmid, mod: cm.mod, course_id: cid, kind: classifyKind(name, cm.mod === "quiz" ? "Tests" : "Uzdevums"),
+          title: name.replace(/\s+(ir jāiesniedz|jāiesniedz|aizveras|termiņš|is due|closes)$/i, ""), due: t, start: null, url, status: null, section: "",
+          details: (e.location ? `Vieta: ${e.location}\n` : "") + htmlToText(e.description).slice(0, 3000) });
+      } else {
+        const desc = (e.location ? `Vieta: ${e.location}\n` : "") + htmlToText(e.description);
+        const start = e.timestart * 1000, dur = (e.timeduration || 0) * 1000;
+        const d = { uid: `event-${e.id}`, course_id: cid, kind: classifyKind(`${name} ${desc}`, "Notikums"), title: name,
+          due: dur ? start + dur : start, start: dur ? start : null, url, status: null, section: "", details: desc.slice(0, 3000) };
+        if (CONSULT_RE.test(`${name} ${desc.slice(0, 200)}`)) { d.kind = "Konsultācija"; consultEvents.push(d); } else deadlines.set(d.uid, d);
+      }
+    }
+    for (const [uid, s] of starts) if (deadlines.has(uid)) deadlines.get(uid).start = s;
+
+    // 2) kursu lapas: faili, uzdevumi, teksti
+    const files = [], texts = [], teachers = new Map(), assigns = [], quizzes = [], extraPages = [];
+    await pool(courses, 3, async c => {
+      try {
+        let doc = await M.doc(c.url), sections = parseSections(doc, M);
+        if (sections.length && !sections.some(s => s.acts.length)) {
+          const links = new Set([...doc.querySelectorAll('a[href*="course/section.php"], a[href*="course/view.php"][href*="section="]')].map(a => M.abs(a.getAttribute("href"))));
+          sections = [];
+          for (const u of [...links].sort()) sections.push(...parseSections(await M.doc(u), M).filter(s => s.acts.length));
+        }
+        const seen = new Set();
+        let firstForum = true;
+        for (const sec of sections) {
+          if (sec.summary) texts.push({ course_id: c.id, title: sec.name, text: sec.summary, url: c.url });
+          for (const a of sec.acts) {
+            if (!a.cmid || seen.has(a.cmid)) continue;
+            seen.add(a.cmid);
+            const uid = `cm-${a.cmid}`;
+            if (deadlines.has(uid)) deadlines.get(uid).section = sec.name;
+            if (a.modtype === "label") { if (a.text) texts.push({ course_id: c.id, title: sec.name, text: a.text, url: c.url }); continue; }
+            if (a.text) texts.push({ course_id: c.id, title: `${sec.name} — ${a.name}`, text: a.text, url: a.url || c.url });
+            const base = { course_id: c.id, section: sec.name, section_num: sec.num, module: a.name, cmid: a.cmid, page_url: a.url, seq: +a.cmid };
+            if (a.modtype === "resource") files.push({ ...base, modtype: "resource", filename: a.name, ftype: a.ftype, details: a.details });
+            else if (a.modtype === "url") files.push({ ...base, modtype: "url", filename: a.name, ftype: "saite", link: a.url });
+            else if (a.modtype === "folder") extraPages.push({ type: "folder", c, a, sec, base });
+            else if (a.modtype === "assign") assigns.push({ c, a, sec, base });
+            else if (a.modtype === "quiz") quizzes.push({ c, a, sec });
+            else if (a.modtype === "page" && /konsult|kontakt|inform|grafik|par kursu|pasniedz|vērtēšan/i.test(a.name)) extraPages.push({ type: "page", c, a });
+            else if (a.modtype === "forum" && (firstForum || /paziņoj|announce|jaunum|news/i.test(a.name))) extraPages.push({ type: "forum", c, a });
+            if (a.modtype === "forum") firstForum = false;
           }
-        });
+        }
       } catch (e) { if (e.code === "login") throw e; warnings.push(`${c.label}: ${e.message}`); }
-      try {
-        const g = await api.call("core_group_get_course_user_groups", { courseid: c.id, userid: info.userid });
-        groups.set(c.id, (g.groups || []).map(x => x.name || ""));
-      } catch (e) { /* nav būtiski */ }
-      progress(`Nolasa kursus: ${c.label}`, ++done / (courses.length + 5));
+      tick(`Kursi: ${c.label}`);
     });
 
-    // pasniedzēji
-    const teachers = new Map();
-    if (ids.length) try {
-      const data = await api.call("core_course_get_courses_by_field", { field: "ids", value: ids.join(",") });
-      const uids = new Set();
-      for (const c of data.courses || []) { const l = (c.contacts || []).map(x => ({ id: +x.id, name: x.fullname })); teachers.set(+c.id, l); l.forEach(x => uids.add(x.id)); }
-      let users = [];
-      if (uids.size) try { users = await api.call("core_user_get_users_by_field", { field: "id", values: [...uids] }); } catch (e) { /* e-pasti var nebūt redzami */ }
-      const um = new Map(users.map(u => [+u.id, u]));
-      for (const [cid, l] of teachers) teachers.set(cid, l.map(x => ({ name: (um.get(x.id) || {}).fullname || x.name, email: (um.get(x.id) || {}).email || "",
-        url: `${api.site}/user/view.php?id=${x.id}&course=${cid}` })));
-    } catch (e) { warnings.push(`pasniedzēji: ${e.message}`); }
-    progress("Uzdevumi…", (done + 1) / (courses.length + 5));
-
-    // uzdevumi
-    if (ids.length) try {
-      const data = await api.call("mod_assign_get_assignments", { courseids: ids });
-      const statusJobs = [];
-      for (const course of data.courses || []) for (const a of course.assignments || []) {
-        const cid = +course.id, name = (a.name || "").trim(), url = `${api.site}/mod/assign/view.php?id=${a.cmid}`;
-        const kind = classifyKind(name, "Uzdevums"), intro = htmlToText(a.intro), sec = cmSection.get(+a.cmid) || "";
-        for (const att of a.introattachments || []) files.push({ course_id: cid, section: sec || "Uzdevumi", section_num: 0, module: name, modtype: "assign",
-          filename: att.filename, fileurl: att.fileurl, cmid: String(a.cmid), size: att.filesize || null, created: att.timecreated || att.timemodified || null,
-          page_url: url, kindHint: kind, deadline_uid: `cm-${a.cmid}` });
-        texts.push({ course_id: cid, title: name, text: intro, url, kind: "uzdevums" });
-        if (!a.duedate) continue;
-        const d = { uid: `cm-${a.cmid}`, course_id: cid, kind, title: name, due: ts(a.duedate), start: ts(a.allowsubmissionsfromdate),
-          url, status: null, section: sec, details: (a.cutoffdate ? `Galīgais termiņš: ${new Date(ts(a.cutoffdate)).toLocaleString("lv-LV")}\n` : "") + intro.slice(0, 5000) };
-        add(d);
-        if (d.due > now - 60 * 864e5) statusJobs.push([d, a.id]);
+    // 3) uzdevumu lapas: statuss, apraksts, pielikumi (vecus, jau zināmus neielādē vēlreiz)
+    const jobs = [];
+    for (const it of assigns) {
+      const uid = `cm-${it.a.cmid}`, d = deadlines.get(uid), p = prevDl.get(uid);
+      if (p && (p.done || (d ? d.due : p.due) < now - 30 * 864e5) && (!d || p.due === d.due)) {
+        if (d) { d.status = p.status; d.details = p.details || d.details; }
+        files.push(...prevFiles.filter(f => f.deadline_uid === uid));
+        continue;
       }
-      await pool(statusJobs, 6, async ([d, aid]) => {
-        try {
-          const st = await api.call("mod_assign_get_submission_status", { assignid: aid });
-          const la = st.lastattempt || {}, sub = la.submission || la.teamsubmission || {};
-          d.status = STATUS_LV[sub.status || ""] ?? sub.status;
-          const grade = htmlToText(((st.feedback || {}).gradefordisplay || "")).trim();
-          if (grade) d.status = `novērtēts: ${grade}`;
-        } catch (e) { if (e.code === "login") throw e; }
+      jobs.push(async () => {
+        const doc = await M.doc(it.a.url);
+        const kind = classifyKind(it.a.name, "Uzdevums");
+        const intro = elText(doc.querySelector(".activity-description, #intro, .box.generalbox"));
+        for (const l of doc.querySelectorAll('a[href*="pluginfile.php"]')) {
+          const href = M.abs(l.getAttribute("href"));
+          if (!/introattachment|\/intro\//.test(href)) continue;
+          files.push({ ...it.base, modtype: "assign", filename: pluginfileName(href.split("?")[0]), fileurl: href.split("?")[0], kindHint: kind, deadline_uid: uid });
+        }
+        let status = null;
+        if (doc.querySelector(".submissionstatussubmitted")) status = "iesniegts";
+        else if (doc.querySelector(".submissionstatusdraft")) status = "melnraksts (nav iesniegts!)";
+        else if (doc.querySelector(".submissionstatustable, .submissionsummarytable")) status = "nav iesniegts";
+        const gradeRow = [...doc.querySelectorAll(".feedback tr, table.generaltable tr")].find(tr => /^(atzīme|vērtējums|grade)$/i.test(cleanText((tr.querySelector("th") || {}).textContent)));
+        const grade = gradeRow ? cleanText((gradeRow.querySelector("td") || {}).textContent) : "";
+        if (grade && status === "iesniegts") status = `novērtēts: ${grade}`;
+        if (d) { d.status = status; if (intro) d.details = intro.slice(0, 5000); d.kind = kind; }
+        texts.push({ course_id: it.c.id, title: it.a.name, text: intro, url: it.a.url });
       });
-    } catch (e) { if (e.code === "login") throw e; warnings.push(`uzdevumi: ${e.message}`); }
-    progress("Testi…", (done + 2) / (courses.length + 5));
-
-    // testi
-    if (ids.length) try {
-      const data = await api.call("mod_quiz_get_quizzes_by_courses", { courseids: ids });
-      const jobs = [];
-      for (const q of data.quizzes || []) {
-        const close = q.timeclose || 0, open = q.timeopen || 0;
-        if (!close && !open) continue;
-        const name = (q.name || "").trim();
-        const details = [open ? `Atveras: ${new Date(ts(open)).toLocaleString("lv-LV")}` : "", close ? `Aizveras: ${new Date(ts(close)).toLocaleString("lv-LV")}` : "",
-          q.timelimit ? `Laika limits: ${Math.round(q.timelimit / 60)} min` : "", q.attempts != null ? `Mēģinājumi: ${+q.attempts === 0 ? "neierobežoti" : q.attempts}` : "",
-          htmlToText(q.intro).slice(0, 3000)].filter(Boolean).join("\n");
-        const d = { uid: `cm-${q.coursemodule}`, course_id: +q.course, kind: classifyKind(name, "Tests"), title: close ? name : `${name} (atveras)`,
-          due: ts(close || open), start: close ? ts(open) : null, url: `${api.site}/mod/quiz/view.php?id=${q.coursemodule}`, status: null,
-          section: cmSection.get(+q.coursemodule) || "", details };
-        add(d);
-        if (d.due > now - 60 * 864e5) jobs.push([d, q.id]);
+    }
+    for (const it of quizzes) {
+      const uid = `cm-${it.a.cmid}`, d = deadlines.get(uid), p = prevDl.get(uid);
+      if (!d) continue;
+      if (p && (p.done || d.due < now - 30 * 864e5)) { d.status = p.status; continue; }
+      jobs.push(async () => {
+        const doc = await M.doc(it.a.url);
+        const n = doc.querySelectorAll("table.quizattemptsummary tbody tr").length;
+        d.status = n || doc.querySelector(".quizattemptsummary") ? `izpildīts${n ? ` (${n} mēģ.)` : ""}` : "nav izpildīts";
+        const intro = elText(doc.querySelector(".activity-description, #intro, .box.generalbox"));
+        if (intro) d.details = intro.slice(0, 3000);
+      });
+    }
+    for (const x of extraPages) jobs.push(async () => {
+      if (x.type === "folder") {
+        const doc = await M.doc(x.a.url);
+        for (const l of doc.querySelectorAll('a[href*="pluginfile.php"][href*="mod_folder"]')) {
+          const href = M.abs(l.getAttribute("href")).split("?")[0];
+          const rest = decodeURIComponent(new URL(href).pathname).split("/mod_folder/content/")[1];
+          const parts = rest ? rest.split("/").slice(1) : [];
+          if (!parts.length) continue;
+          files.push({ ...x.base, modtype: "folder", filename: parts[parts.length - 1], subpath: parts.slice(0, -1).join("/"), fileurl: href });
+        }
+      } else if (x.type === "page") {
+        const doc = await M.doc(x.a.url);
+        const main = doc.querySelector("div.box.generalbox, [role=main] .generalbox, #region-main");
+        if (main) texts.push({ course_id: x.c.id, title: x.a.name, text: elText(main), url: x.a.url });
+      } else if (x.type === "forum") {
+        const doc = await M.doc(x.a.url);
+        const links = [...new Set([...doc.querySelectorAll('a[href*="discuss.php?d="]')].map(l => M.abs(l.getAttribute("href")).split("#")[0]))].slice(0, 3);
+        for (const href of links) {
+          const ds = await M.doc(href);
+          const post = ds.querySelector(".post-content-container, .posting, .content .text_to_html");
+          if (post) texts.push({ course_id: x.c.id, title: cleanName(ds.querySelector("h2, h3.discussionname, .discussionname")) || "Paziņojums", text: elText(post), url: href });
+        }
       }
-      await pool(jobs, 6, async ([d, qid]) => {
-        try {
-          const at = await api.call("mod_quiz_get_user_attempts", { quizid: qid, status: "finished" });
-          const n = (at.attempts || []).length;
-          d.status = n ? `izpildīts (${n} mēģ.)` : "nav izpildīts";
-        } catch (e) { if (e.code === "login") throw e; }
-      });
-    } catch (e) { if (e.code === "login") throw e; warnings.push(`testi: ${e.message}`); }
-    progress("Kalendārs…", (done + 3) / (courses.length + 5));
-
-    // kalendāra notikumi (eksāmeni, konsultācijas u.c.)
-    const consultEvents = [];
-    if (ids.length) try {
-      const t = Math.floor(now / 1000);
-      const data = await api.call("core_calendar_get_calendar_events", { events: { courseids: ids },
-        options: { userevents: 1, siteevents: 1, timestart: t - 365 * 86400, timeend: t + 365 * 86400 } });
-      for (const e of data.events || []) {
-        const mod = e.modulename || "";
-        if (["assign", "quiz"].includes(mod) || (e.eventtype === "open" && mod)) continue;
-        const name = (e.name || "").trim(), desc = (e.location ? `Vieta: ${e.location}\n` : "") + htmlToText(e.description);
-        const start = ts(e.timestart), dur = (e.timeduration || 0) * 1000;
-        const d = { uid: `event-${e.id}`, course_id: +(e.courseid || 0), kind: classifyKind(`${name} ${desc}`, "Notikums"), title: name,
-          due: dur ? start + dur : start, start: dur ? start : null, url: e.url || "", status: null, section: "", details: desc.slice(0, 3000) };
-        if (CONSULT_RE.test(`${name} ${desc.slice(0, 200)}`)) { d.kind = "Konsultācija"; consultEvents.push(d); } else add(d);
+    });
+    // pasniedzēji (course/info.php + profila e-pasts)
+    for (const c of courses) jobs.push(async () => {
+      const doc = await M.doc(`${M.site}/course/info.php?id=${c.id}`);
+      const out = [], seenU = new Set();
+      for (const a of [...doc.querySelectorAll('.teachers a[href*="user/"], .coursecontact a[href*="user/"], ul.teachers a')].slice(0, 6)) {
+        const m = /[?&]id=(\d+)/.exec(a.getAttribute("href") || "");
+        if (!m || seenU.has(m[1])) continue;
+        seenU.add(m[1]);
+        const url = `${M.site}/user/view.php?id=${m[1]}&course=${c.id}`;
+        let email = "";
+        try { const p = await M.doc(url); const mail = p.querySelector('a[href^="mailto:"]'); email = mail ? mail.getAttribute("href").slice(7).split("?")[0] : ""; }
+        catch (e) { if (e.code === "login") throw e; }
+        out.push({ name: cleanName(a), email, url });
       }
-    } catch (e) { if (e.code === "login") throw e; warnings.push(`kalendārs: ${e.message}`); }
+      teachers.set(c.id, out);
+      tick(`Pasniedzēji: ${c.label}`);
+    });
+    let failed = 0;
+    await pool(jobs, 3, async job => {
+      try { await job(); } catch (e) { if (e.code === "login") throw e; if (++failed <= 5) warnings.push(e.message); }
+    });
+    if (failed > 5) warnings.push(`… un vēl ${failed - 5} kļūdas`);
+    tick("Apstrādā…");
 
-    // paziņojumi (teksti konsultācijām)
-    try {
-      const forums = await api.call("mod_forum_get_forums_by_courses", { courseids: ids });
-      await pool((forums || []).filter(f => f.type === "news"), 4, async f => {
-        const d = await api.call("mod_forum_get_forum_discussions", { forumid: f.id, page: 0, perpage: 10 });
-        for (const disc of d.discussions || []) texts.push({ course_id: +f.course, title: disc.name || "Paziņojums", text: htmlToText(disc.message),
-          url: `${api.site}/mod/forum/discuss.php?d=${disc.discussion}`, kind: "paziņojums" });
-      });
-    } catch (e) { /* nav būtiski */ }
-    progress("Apstrādā…", (done + 4) / (courses.length + 5));
-
-    // atlase pēc programmas/grupas
-    const matchers = new Map(courses.map(c => [c.id, Matcher.build(program, group, groups.get(c.id) || [])]));
+    // 4) atlase pēc programmas/grupas
+    const matchers = new Map(courses.map(c => [c.id, Matcher.build(program, group, [])]));
     const all = [...deadlines.values()];
     for (const d of all) { const m = matchers.get(d.course_id); d.relevance = m ? m.first(d.title, d.section, (d.details || "").slice(0, 400)) : null; }
     const keep = otherGroups === "keep";
@@ -371,17 +474,20 @@
     const visible = all.filter(d => keep || d.relevance !== OTHER).map(decorate).sort((a, b) => a.due - b.due);
     const hidden = all.filter(d => !keep && d.relevance === OTHER).map(decorate).sort((a, b) => a.due - b.due);
 
-    const outFiles = files.map(f => {
+    const fileByKey = new Map();
+    for (const f of files) {
       const m = matchers.get(f.course_id);
       const other = !!(m && m.first(`${f.filename} ${f.module}`, f.subpath || "", f.section) === OTHER);
       const c = byId.get(f.course_id) || {};
-      return { key: `${f.course_id}:${f.modtype}:${f.cmid}:${f.subpath || ""}/${f.filename}`, course_id: f.course_id, course: c.label || "", course_full: c.full || "",
-        category: f.modtype === "url" ? "Saites" : classifyFile(f), filename: f.filename, module: f.module, section: f.section, modtype: f.modtype,
-        cmid: f.cmid, size: f.size, created: f.created, fileurl: f.fileurl || "", link: f.link || "", page_url: f.page_url,
-        deadline_uid: f.deadline_uid || null, other };
-    }).filter(f => keep || !f.other);
+      const key = `${f.course_id}:${f.modtype}:${f.cmid}:${f.subpath || ""}/${f.filename}`;
+      fileByKey.set(key, { key, course_id: f.course_id, course: c.label || "", course_full: c.full || "",
+        category: f.modtype === "url" ? "Saites" : classifyFile(f), filename: f.filename, ftype: f.ftype || "", module: f.module, section: f.section, subpath: f.subpath || "",
+        modtype: f.modtype, cmid: f.cmid, seq: f.seq || +f.cmid || 0, size: f.size || null, created: f.created || null, details: f.details || "",
+        fileurl: f.fileurl || "", link: f.link || "", page_url: f.page_url, deadline_uid: f.deadline_uid || null, other });
+    }
+    const outFiles = [...fileByKey.values()].filter(f => keep || !f.other);
 
-    // konsultācijas
+    // 5) konsultācijas
     const items = consultItems(texts), mails = emailsFromTexts(texts);
     const consult = courses.map(c => {
       const tl = (teachers.get(c.id) || []).map(t => ({ ...t }));
@@ -399,7 +505,7 @@
           .map(e => ({ title: e.title, start: e.start || e.due, end: e.due, place: place(e.details || ""), url: e.url })) };
     });
     progress("Gatavs", 1);
-    return { generated: now, user: info.fullname || "", userid: info.userid, site: api.site, courses, deadlines: visible, hidden, files: outFiles,
+    return { generated: now, user: info.fullname || "", userid: info.userid, site: M.site, courses, deadlines: visible, hidden, files: outFiles,
       consult, warnings, filter: [String(program || "").toUpperCase(), group ? `${group}. grupa` : ""].filter(Boolean).join(", ") };
   }
 
@@ -420,7 +526,7 @@
     return { first: false, items };
   }
 
-  const api = { flatten, encodeForm, htmlToText, Moodle, MoodleError, classifyKind, classifyFile, groupNumbers, Matcher, MINE, OTHER,
-    consultItems, emailsFromTexts, sync, diff, isDone };
+  const api = { htmlToText, Moodle, MoodleError, classifyKind, classifyFile, groupNumbers, Matcher, MINE, OTHER,
+    consultItems, emailsFromTexts, parseSections, ftypeFromIcon, sync, diff, isDone };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Logic = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -22,12 +22,12 @@ import java.net.URL
 import java.util.concurrent.Executors
 
 const val SITE_HOST = "estudijas.rtu.lv"
-const val USER_AGENT = "Mozilla/5.0 (Linux; Android) estudijas-sync-android MoodleMobile"
 
 class MainActivity : Activity() {
     private lateinit var web: WebView
     private val pool = Executors.newFixedThreadPool(6)
     private var resumedOnce = false
+    private var userAgent = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +44,7 @@ class MainActivity : Activity() {
             allowContentAccess = false
             setSupportMultipleWindows(false)
         }
+        userAgent = web.settings.userAgentString
         web.webChromeClient = WebChromeClient()
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
@@ -56,21 +57,6 @@ class MainActivity : Activity() {
         web.addJavascriptInterface(Bridge(), "Native")
         if (savedInstanceState != null) web.restoreState(savedInstanceState)
         else web.loadUrl("file:///android_asset/web/index.html")
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        deliverLogin(intent)
-    }
-
-    /** Žetons no TokenActivity (pieteikšanās pārlūkā). */
-    private fun deliverLogin(intent: Intent?) {
-        if (intent == null || !(intent.hasExtra("token") || intent.hasExtra("error"))) return
-        val token = intent.getStringExtra("token") ?: ""
-        val priv = intent.getStringExtra("private") ?: ""
-        val err = intent.getStringExtra("error") ?: ""
-        intent.removeExtra("token"); intent.removeExtra("error")
-        js("window.__onLogin && window.__onLogin(${q(token)}, ${q(priv)}, ${q(err)})")
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -91,6 +77,11 @@ class MainActivity : Activity() {
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        CookieManager.getInstance().flush()
+    }
+
     override fun onDestroy() {
         pool.shutdownNow()
         web.destroy()
@@ -102,10 +93,9 @@ class MainActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != REQ_LOGIN) return
-        val token = data?.getStringExtra("token") ?: ""
-        val priv = data?.getStringExtra("private") ?: ""
-        val err = data?.getStringExtra("error") ?: if (token.isEmpty() && resultCode == RESULT_OK) "Pieteikšanās neizdevās" else ""
-        js("window.__onLogin(${q(token)}, ${q(priv)}, ${q(err)})")
+        val ok = resultCode == RESULT_OK
+        val err = data?.getStringExtra("error") ?: ""
+        js("window.__onLogin && window.__onLogin($ok, ${q(err)})")
     }
 
     private fun js(code: String) = runOnUiThread { web.evaluateJavascript(code, null) }
@@ -122,27 +112,36 @@ class MainActivity : Activity() {
     }
 
     inner class Bridge {
-        /** HTTP pieprasījums uz estudijas.rtu.lv (tikai turp). Rezultāts — window.__nativeResult(id, status, text). */
+        /**
+         * HTTP pieprasījums uz estudijas.rtu.lv (tikai turp) ar lietotnē ielogotās sesijas sīkdatnēm.
+         * Pāradresācijām neseko (JS to dara pats). Rezultāts — window.__nativeResult(id, status, text, location).
+         */
         @JavascriptInterface
         fun request(id: String, method: String, url: String, body: String, ctype: String) {
             pool.execute {
                 var status = 0
                 var text: String
+                var location = ""
                 try {
                     val u = URL(url)
                     if (u.protocol != "https" || u.host != SITE_HOST) throw SecurityException("Neatļauta adrese")
+                    val cm = CookieManager.getInstance()
                     val c = u.openConnection() as HttpURLConnection
+                    c.instanceFollowRedirects = false
                     c.requestMethod = if (method == "POST") "POST" else "GET"
                     c.connectTimeout = 20_000
                     c.readTimeout = 90_000
-                    c.setRequestProperty("User-Agent", USER_AGENT)
-                    c.setRequestProperty("Accept", "application/json")
+                    c.setRequestProperty("User-Agent", userAgent)
+                    cm.getCookie(url)?.let { c.setRequestProperty("Cookie", it) }
                     if (method == "POST") {
                         c.doOutput = true
                         c.setRequestProperty("Content-Type", ctype.ifEmpty { "application/x-www-form-urlencoded" })
+                        c.setRequestProperty("X-Requested-With", "XMLHttpRequest")
                         c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                     }
                     status = c.responseCode
+                    for ((k, v) in c.headerFields) if (k != null && k.equals("Set-Cookie", true)) v.forEach { cm.setCookie(url, it) }
+                    location = c.getHeaderField("Location") ?: ""
                     val stream = if (status >= 400) c.errorStream else c.inputStream
                     text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
                     c.disconnect()
@@ -150,7 +149,7 @@ class MainActivity : Activity() {
                     status = 0
                     text = e.message ?: e.javaClass.simpleName
                 }
-                js("window.__nativeResult(${q(id)}, $status, ${q(text)})")
+                js("window.__nativeResult(${q(id)}, $status, ${q(text)}, ${q(location)})")
             }
         }
 
@@ -163,16 +162,15 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun openUrl(url: String) = runOnUiThread { openExternal(url) }
 
-        /** mode "browser" — pārlūkā (saglabātās paroles); "app" — lietotnes iekšējā logā. */
+        /** Pieteikšanās lietotnes logā (sesijas sīkdatnes vajag lietotnē, tāpēc ne ārējā pārlūkā). */
         @JavascriptInterface
-        fun login(email: String, mode: String) = runOnUiThread {
-            if (mode == "browser" && openBrowserLogin(this@MainActivity)) return@runOnUiThread
+        fun login(email: String) = runOnUiThread {
             @Suppress("DEPRECATION")
             startActivityForResult(Intent(this@MainActivity, LoginActivity::class.java).putExtra("email", email), REQ_LOGIN)
         }
 
         @JavascriptInterface
-        fun clearCookies() = runOnUiThread { CookieManager.getInstance().removeAllCookies(null) }
+        fun clearCookies() = runOnUiThread { CookieManager.getInstance().removeAllCookies(null); CookieManager.getInstance().flush() }
 
         @JavascriptInterface
         fun addEvent(title: String, begin: Double, end: Double, description: String, location: String) = runOnUiThread {

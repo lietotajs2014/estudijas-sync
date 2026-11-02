@@ -146,18 +146,18 @@ Google Calendar draugam: vai nu pievieno viņa Gmail kā Test user un iedod savu
 
 ## Android lietotne
 
-Lietotne strādā patstāvīgi, dators tai nav vajadzīgs. Tā rāda:
+Lietotne strādā patstāvīgi, dators tai nav vajadzīgs. RTU estudijās Moodle mobilās lietotnes piekļuve ir izslēgta, tāpēc lietotne nolasa estudiju lapas ar tavu sesiju, tāpat kā datora programma. Tā rāda:
 
 - **termiņus** ar statusu (iesniegts / nav iesniegts / nokavēts), 2 nedēļu laika joslu un pagājušos termiņus pa mēnešiem;
 - **konsultācijas** un pasniedzēju e-pastus;
-- **failus** pa kursiem ar meklēšanu un filtriem. Faili netiek lejupielādēti: piespiežot "Atvērt dokumentu", tas atveras pārlūkā vai PDF/Word lietotnē;
+- **failus** pa kursiem ar meklēšanu un filtriem. Faili netiek lejupielādēti: piespiežot "Atvērt dokumentu", tas atveras pārlūkā (pirmo reizi pārlūkā var būt jāpieslēdzas estudijām);
 - **jaunumus** kopš iepriekšējās sinhronizācijas.
 
 **Instalēšana:**
 
 1. Lejupielādē **RTU-estudijas.apk**: repozitorija lapā → **Actions** → *Android APK* → jaunākais zaļais palaidums → *Artifacts* → *RTU-estudijas-apk* (ZIP, iekšā APK). Repozitorijs ir privāts, tāpēc jābūt ielogotam GitHub ar kontu, kam ir piekļuve.
 2. Atver lejupielādēto failu. Ja Android jautā, atļauj instalēt lietotnes no šī avota (pārlūka).
-3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu). Pieslēgšanās atveras pārlūkā (tur strādā saglabātās paroles), un pēc tās pārlūks atgriežas lietotnē. Ja pārlūks paliek estudiju lapā, atgriezies lietotnē un spied **Pabeigt pieslēgšanos**. Ja telefonā ir arī oficiālā Moodle lietotne, Android var pajautāt, ar ko atvērt, un tad izvēlies *RTU estudijas*.
+3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu). Kad atveras estudiju lapa, logs aizveras pats. E-pasts un parole jāievada vienreiz, jo pārlūka saglabātās paroles lietotnē nav pieejamas. Microsoft atceras kontu, un, kad estudiju sesija beidzas, lietotne pieslēdzas no jauna pati (dažreiz var prasīt MFA).
 
 Jaunāku versiju instalē tāpat, virsū vecajai, un dati saglabājas. Katru reizi, kad repozitorijā mainās `android/` mape, GitHub Actions automātiski uzbūvē jaunu APK (tas glabājas 30 dienas).
 

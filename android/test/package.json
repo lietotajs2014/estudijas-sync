@@ -1,0 +1,6 @@
+{
+  "name": "estudijas-android-tests",
+  "private": true,
+  "scripts": { "test": "node logic.test.js" },
+  "devDependencies": { "linkedom": "0.18.12" }
+}
