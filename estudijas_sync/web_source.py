@@ -13,7 +13,8 @@ from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
 
-from .auth import is_site_page, launch_context, safe_sesskey
+from .auth import (_accept_stay_signed_in, is_site_page, launch_context, login_window, restore_cookies,
+                   safe_sesskey, save_cookies)
 from .config import Config
 from .model import (CollectResult, Course, Deadline, FileItem, Link, LoginRequired,
                     MoodleError, TextBlock)
@@ -43,8 +44,10 @@ def _clean_name(el) -> str:
 class WebSource:
     name = "web"
 
-    def __init__(self, cfg: Config):
+    def __init__(self, cfg: Config, interactive: bool = True, prog=None):
         self.cfg = cfg
+        self.interactive = interactive   # ja sesija beigusies — atvērt redzamu logu pieteikšanās/MFA koda dēļ
+        self.prog = prog
         self.site = cfg.site
         self.tz = ZoneInfo(cfg.timezone)
         self.now_naive = datetime.now(self.tz).replace(tzinfo=None)
@@ -54,24 +57,43 @@ class WebSource:
         from playwright.sync_api import sync_playwright
         self._pw = sync_playwright().start()
         try:
-            self.ctx = launch_context(self._pw, self.cfg, headless=True)
-            self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
-            self._ensure_session()
+            self._open_headless()
+            try:
+                self._ensure_session()
+            except LoginRequired:
+                if not self.interactive:
+                    raise
+                # Sesija beigusies: atveram redzamu logu, lai var ievadīt paroli un redzēt MFA kodu,
+                # tad turpinām neredzami ar jaunajām sīkdatnēm.
+                self.ctx.close()
+                self.ctx = None
+                vis_ctx, _page, _sk = login_window(self._pw, self.cfg, 600, self.prog)
+                vis_ctx.close()
+                self._open_headless()
+                self._ensure_session()
+            save_cookies(self.ctx, self.cfg)
         except Exception:
             self.__exit__()
             raise
         return self
 
+    def _open_headless(self) -> None:
+        self.ctx = launch_context(self._pw, self.cfg, headless=True)
+        restore_cookies(self.ctx, self.cfg)
+        self.page = self.ctx.pages[0] if self.ctx.pages else self.ctx.new_page()
+
     def __exit__(self, *exc):
         try:
             if getattr(self, "ctx", None):
+                save_cookies(self.ctx, self.cfg)
                 self.ctx.close()
         finally:
             self._pw.stop()
 
     def _ensure_session(self) -> None:
         self.page.goto(self.site + "/my/", wait_until="domcontentloaded", timeout=60000)
-        for _ in range(40):  # MS SSO bieži pāradresē atpakaļ automātiski
+        for _ in range(25):  # MS SSO bieži pāradresē atpakaļ automātiski
+            _accept_stay_signed_in(self.page)
             if is_site_page(self.page.url, self.site):
                 sk = safe_sesskey(self.page)
                 if sk:

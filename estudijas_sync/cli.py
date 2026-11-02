@@ -93,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
     sp.add_argument("--redownload", action="store_true", help="lejupielādēt visus failus no jauna")
     sp.add_argument("--no-calendar", action="store_true", help="neatjaunināt Google Calendar")
     sp.add_argument("-q", "--quiet", action="store_true", help="bez progresa joslas")
+    sp.add_argument("--no-login-window", action="store_true",
+                    help="neatvērt pārlūka logu, ja vajag pieteikties (tikai brīdināt)")
     sub.add_parser("status", help="parādīt stāvokli un tuvākos termiņus")
     sub.add_parser("gcal-auth", help="autorizēt Google Calendar")
     sub.add_parser("install-schedule", help="palaist automātiski (laiki no konfigurācijas)")
@@ -149,11 +151,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "sync":
-        from .sync import AlreadyRunning, run_sync
+        from .sync import AlreadyRunning, sync_with_relogin
         try:
             from .progress import Progress
-            r = run_sync(cfg, redownload=args.redownload, no_calendar=args.no_calendar,
-                         prog=Progress(enabled=False if args.quiet else None))
+            r = sync_with_relogin(cfg, redownload=args.redownload, no_calendar=args.no_calendar,
+                         prog=Progress(enabled=False if args.quiet else None),
+                         interactive=not args.no_login_window)
         except LoginRequired as e:
             return _relogin_needed(cfg, str(e))
         except AlreadyRunning as e:

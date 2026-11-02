@@ -102,6 +102,12 @@ Citas komandas:
 - `sync --redownload` — lejupielādē visu no jauna;
 - `uninstall-schedule` — noņem automātisko palaišanu.
 
+### Microsoft kods (MFA) sinhronizējot
+
+Ja sinhronizējot estudiju sesija ir beigusies, skripts **atver redzamu pārlūka logu**. Tur ievadi paroli, un, ja Microsoft rāda skaitli, ievadi to Authenticator lietotnē telefonā. Pēc tam logs aizveras, un sinhronizācija turpinās neredzami. E-pasts tiek aizpildīts automātiski, un uz "Stay signed in?" atbilde "Yes" tiek dota automātiski.
+
+Sesijas sīkdatnes tiek saglabātas starp palaišanām (`cookies.json` profila mapē), tāpēc kods nav jāievada katru reizi. Tas pats notiek automātiskajās palaišanās. Ja to negribi, iestati `login_popup = false` vai lieto `sync --no-login-window`: tad būs tikai brīdinājums.
+
 ### Ja login saka "API žetonu iegūt neizdevās"
 
 Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skripts pārslēdzas uz **pārlūka režīmu**: sinhronizācija notiek neredzamā Chromium ar saglabāto sesiju un nolasa lapas. Tas darbojas, bet:

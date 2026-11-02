@@ -46,6 +46,11 @@ lookahead_days = 150
 # Visi jaunumi tiek rakstīti arī JAUNUMI.md un UZDEVUMI.md augšā.
 notify = true
 
+# Ja sinhronizējot estudiju sesija ir beigusies, atvērt redzamu pārlūka logu, kur ievadīt paroli
+# un redzēt/apstiprināt Microsoft Authenticator kodu (arī automātiskajās palaišanās).
+# false = neatvērt, tikai brīdināt UZDEVUMI.md un paziņojumā.
+login_popup = true
+
 [schedule]
 # Automātiskās palaišanas laiki (install-schedule)
 times = ["07:30", "19:30"]

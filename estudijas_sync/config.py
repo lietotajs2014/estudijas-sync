@@ -37,6 +37,7 @@ class Config:
     skip_extensions: list[str] = field(default_factory=list)
     lookahead_days: int = 150
     notify: bool = True
+    login_popup: bool = True
     schedule_times: list[str] = field(default_factory=lambda: ["07:30", "19:30"])
     ics: bool = True
     include_text_dates: bool = True
@@ -84,6 +85,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         skip_extensions=[e.lower() for e in raw.get("skip_extensions", [])],
         lookahead_days=int(raw.get("lookahead_days", 150)),
         notify=bool(raw.get("notify", True)),
+        login_popup=bool(raw.get("login_popup", True)),
         schedule_times=list(sched.get("times", ["07:30", "19:30"])),
         ics=bool(cal.get("ics", True)),
         include_text_dates=bool(cal.get("include_text_dates", True)),

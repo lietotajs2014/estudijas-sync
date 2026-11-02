@@ -245,6 +245,51 @@ def test_full_sync(tmp_path=None):
     print((out / "UZDEVUMI.md").read_text(encoding="utf-8")[:1500])
 
 
+def test_web_login_popup_flow():
+    """Pārlūka režīmā: ja neredzamā sesija beigusies, atver redzamu logu un turpina."""
+    from estudijas_sync import web_source as ws
+    from estudijas_sync.model import LoginRequired
+    calls = []
+
+    class Ctx:
+        pages = []
+        def new_page(self): return object()
+        def close(self): calls.append("close")
+        def cookies(self): return []
+    ws.launch_context = lambda pw, cfg, headless: (calls.append("headless" if headless else "visible"), Ctx())[1]
+    ws.login_window = lambda pw, cfg, t, prog: (calls.append("login_window"), (Ctx(), None, "sk"))[1]
+    state = {"n": 0}
+
+    def ensure(self):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise LoginRequired("beigusies")
+        self.sesskey = "sk"
+    ws.WebSource._ensure_session = ensure
+
+    class PW:
+        def stop(self): calls.append("stop")
+    import playwright.sync_api as pa
+    orig = pa.sync_playwright
+    pa.sync_playwright = lambda: type("S", (), {"start": lambda self: PW()})()
+    try:
+        cfg = load_config("popup")
+        with ws.WebSource(cfg, interactive=True) as src:
+            assert src.sesskey == "sk"
+        assert calls[:3] == ["headless", "close", "login_window"] and calls.count("headless") == 2, calls
+        state["n"] = 0
+        calls.clear()
+        try:
+            with ws.WebSource(cfg, interactive=False):
+                pass
+            raise AssertionError("vajadzēja LoginRequired")
+        except LoginRequired:
+            pass
+        assert "login_window" not in calls
+    finally:
+        pa.sync_playwright = orig
+
+
 def test_webui():
     import json as _json
     import threading

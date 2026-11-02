@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
+import os
 import random
 import re
 import time
@@ -40,6 +42,94 @@ def launch_context(pw, cfg: Config, headless: bool):
         viewport={"width": 1280, "height": 900}, accept_downloads=True)
 
 
+# ---- sīkdatņu saglabāšana ----
+# Chromium pēc aizvēršanas aizmirst "sesijas" sīkdatnes (arī Moodle sesiju), tāpēc katra
+# sinhronizācija prasītu Microsoft pieteikšanos ar MFA no jauna. Saglabājam tās paši.
+
+def cookies_path(cfg: Config):
+    return cfg.data_dir / "cookies.json"
+
+
+def save_cookies(ctx, cfg: Config) -> None:
+    try:
+        cookies = [c for c in ctx.cookies()
+                   if any(d in c.get("domain", "") for d in ("rtu.lv", "microsoftonline.com", "microsoft.com", "live.com"))]
+        p = cookies_path(cfg)
+        p.write_text(json.dumps(cookies), encoding="utf-8")
+        try:
+            os.chmod(p, 0o600)
+        except OSError:
+            pass
+    except Exception as e:
+        log.info("Sīkdatnes nesaglabājās: %s", e)
+
+
+def restore_cookies(ctx, cfg: Config) -> None:
+    p = cookies_path(cfg)
+    if not p.exists():
+        return
+    try:
+        now = time.time()
+        cookies = [c for c in json.loads(p.read_text(encoding="utf-8"))
+                   if c.get("expires", -1) in (-1, None) or c["expires"] > now]
+        if cookies:
+            ctx.add_cookies(cookies)
+    except Exception as e:
+        log.info("Sīkdatnes neatjaunojās: %s", e)
+
+
+def prefill_email(page, email: str) -> None:
+    """Ieraksta e-pastu Microsoft logā (paroli un MFA lietotājs ievada pats)."""
+    if not email:
+        return
+    try:
+        page.wait_for_selector("input[type=email]", timeout=15000)
+        if not page.input_value("input[type=email]"):
+            page.fill("input[type=email]", email)
+            page.keyboard.press("Enter")
+    except Exception:
+        pass
+
+
+def _accept_stay_signed_in(page) -> None:
+    """Microsoft "Stay signed in?" → Yes, lai nākamreiz MFA nebūtu jāapstiprina tik bieži."""
+    try:
+        if "login.microsoftonline.com" in page.url and page.query_selector("#KmsiCheckboxField, #KmsiDescription"):
+            page.click("#idSIButton9", timeout=2000)
+    except Exception:
+        pass
+
+
+def login_window(pw, cfg: Config, timeout_s: int = 600, prog=None):
+    """Atver REDZAMU pārlūka logu, lai var ievadīt paroli un redzēt/apstiprināt MFA kodu.
+    Atgriež (ctx, page, sesskey) — ctx paliek atvērts; vai izmet LoginRequired."""
+    try:
+        ctx = launch_context(pw, cfg, headless=False)
+    except Exception as e:
+        raise LoginRequired(f"Nevar atvērt pārlūka logu pieteikšanās veikšanai ({e}). "
+                            "Palaid sinhronizāciju pats vai paneļa pogu 'Pieteikties'.") from e
+    restore_cookies(ctx, cfg)
+    page = ctx.pages[0] if ctx.pages else ctx.new_page()
+    try:
+        page.bring_to_front()
+    except Exception:
+        pass
+    msg = ("Atvērts pārlūka logs: piesakies ar RTU kontu. Ja Microsoft rāda skaitli, ievadi to "
+           "Authenticator lietotnē telefonā.")
+    print("\n➡  " + msg + f" Gaidu līdz {timeout_s // 60} min…")
+    if prog:
+        prog.note(msg)
+    page.goto(cfg.site + "/my/")
+    prefill_email(page, cfg.email)
+    sesskey = wait_logged_in(page, cfg.site, timeout_s)
+    if not sesskey:
+        ctx.close()
+        raise LoginRequired(f"Pieteikšanās netika pabeigta {timeout_s // 60} minūšu laikā.")
+    save_cookies(ctx, cfg)
+    print("✔  Pieteikšanās estudijās izdevās.")
+    return ctx, page, sesskey
+
+
 def is_site_page(url: str, site: str) -> bool:
     return url.startswith(site) and "/login/" not in url and "/auth/" not in url
 
@@ -54,6 +144,7 @@ def safe_sesskey(page) -> str | None:
 def wait_logged_in(page, site: str, timeout_s: int) -> str | None:
     end = time.time() + timeout_s
     while time.time() < end:
+        _accept_stay_signed_in(page)
         if is_site_page(page.url, site):
             sk = safe_sesskey(page)
             if sk:
@@ -102,30 +193,15 @@ def try_get_token(ctx, site: str) -> tuple[str, str | None]:
                       f"redirect='{loc[:120]}'). {snippet}")
 
 
-def interactive_login(cfg: Config, force_web: bool = False) -> dict:
+def interactive_login(cfg: Config, force_web: bool = False, prog=None) -> dict:
     from playwright.sync_api import sync_playwright
 
     from .moodle_api import MoodleAPI
 
     site = cfg.site
     with sync_playwright() as pw:
-        ctx = launch_context(pw, cfg, headless=False)
+        ctx, page, _sk = login_window(pw, cfg, 600, prog)
         try:
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-            page.goto(site + "/my/")
-            if cfg.email:
-                try:  # aizpilda e-pastu Microsoft logā (paroli ievadi pats)
-                    page.wait_for_selector("input[type=email]", timeout=20000)
-                    page.fill("input[type=email]", cfg.email)
-                    page.keyboard.press("Enter")
-                except Exception:
-                    pass
-            print("\n➡  Pārlūkā piesakies ar RTU e-pastu (Microsoft). Ja jautā 'Stay signed in?', spied 'Yes'.")
-            print("   Gaidu līdz 10 minūtēm…")
-            sesskey = wait_logged_in(page, site, 600)
-            if not sesskey:
-                raise LoginRequired("Pieteikšanās netika pabeigta 10 minūšu laikā.")
-            print("✔  Pieteikšanās estudijās izdevās.")
             auth = {"mode": "web", "obtained": datetime.now().isoformat(timespec="seconds")}
             if not force_web:
                 try:

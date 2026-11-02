@@ -154,10 +154,10 @@ class App:
         return True, "Sākts"
 
     def job_sync(self) -> str:
-        from .sync import AlreadyRunning, run_sync
+        from .sync import AlreadyRunning, sync_with_relogin
         cfg = self.cfg()
         try:
-            r = run_sync(cfg, prog=self.prog)
+            r = sync_with_relogin(cfg, prog=self.prog)
         except LoginRequired as e:
             from .cli import _relogin_needed
             _relogin_needed(cfg, str(e))
@@ -168,7 +168,7 @@ class App:
 
     def job_login(self) -> str:
         from .auth import interactive_login
-        auth = interactive_login(self.cfg())
+        auth = interactive_login(self.cfg(), prog=self.prog)
         return ("Pieteikšanās izdevās — API režīms (pārlūks turpmāk nav vajadzīgs)." if auth["mode"] == "api"
                 else "Pieteikšanās izdevās — pārlūka režīms (ik pa laikam būs jāpiesakās no jauna).")
 

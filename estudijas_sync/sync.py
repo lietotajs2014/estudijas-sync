@@ -38,7 +38,7 @@ def run_lock(cfg: Config):
         p.unlink(missing_ok=True)
 
 
-def make_source(cfg: Config):
+def make_source(cfg: Config, interactive: bool = True, prog=None):
     auth = load_auth(cfg)
     if not auth:
         raise LoginRequired("Nav pieteikšanās datu.")
@@ -46,7 +46,7 @@ def make_source(cfg: Config):
         from .api_source import ApiSource
         return ApiSource(cfg, auth)
     from .web_source import WebSource
-    return WebSource(cfg)
+    return WebSource(cfg, interactive=interactive and cfg.login_popup, prog=prog)
 
 
 def filter_courses(courses: list[Course], cfg: Config) -> list[Course]:
@@ -150,7 +150,8 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
     return report
 
 
-def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None) -> dict:
+def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None,
+             interactive: bool = True) -> dict:
     prog = prog or NullProgress()
     tz = ZoneInfo(cfg.timezone)
     now = datetime.now(tz)
@@ -158,7 +159,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     out = cfg.output_dir
     out.mkdir(parents=True, exist_ok=True)
 
-    with run_lock(cfg), make_source(cfg) as src:
+    with run_lock(cfg), make_source(cfg, interactive, prog) as src:
         prog.note(f"Pieslēdzas estudijām ({src.name} režīms)…")
         info = src.site_info()
         courses = filter_courses(src.courses(), cfg)
@@ -246,6 +247,20 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
             "new": len(report["new"]), "updated": len(report["updated"]), "errors": len(report["errors"]),
             "warnings": len(warnings), "gcal_changes": gcal_changes, "output": str(out),
             "changes_text": chg.render_console(ch, by_id), "drive_copied": len(drive_copied)}
+
+
+def sync_with_relogin(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None,
+                      interactive: bool = True) -> dict:
+    """Sinhronizē; ja API piekļuve beigusies, atver redzamu pieteikšanās logu (MFA kods) un mēģina vēlreiz."""
+    try:
+        return run_sync(cfg, redownload, no_calendar, prog, interactive)
+    except LoginRequired:
+        auth = load_auth(cfg) or {}
+        if not (interactive and cfg.login_popup) or auth.get("mode") == "web":
+            raise  # pārlūka režīmā logs jau tika atvērts WebSource iekšā
+        from .auth import interactive_login
+        interactive_login(cfg, prog=prog)
+        return run_sync(cfg, redownload, no_calendar, prog, interactive)
 
 
 def _dl_json(d, by_id: dict) -> dict:
