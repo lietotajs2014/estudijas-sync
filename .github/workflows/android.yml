@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android
@@ -15,23 +15,23 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: "22"
 
       - name: Loģikas testi
         run: node android/test/logic.test.js
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       - name: Paraksta atslēga
         env:
@@ -55,8 +55,25 @@ jobs:
           ./gradlew --no-daemon assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/RTU-estudijas.apk"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: RTU-estudijas-apk
           path: ${{ runner.temp }}/RTU-estudijas.apk
           retention-days: 30
+
+      # Nepublicēts (draft) būvējums: to redz tikai tie, kam ir piekļuve repozitorijam; nav "Release".
+      - name: Saglabā melnrakstā
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          R=repos/$GITHUB_REPOSITORY/releases
+          ID=$(gh api "$R" --jq '[.[] | select(.draft and .tag_name=="android-build")][0].id // empty')
+          if [ -z "$ID" ]; then
+            ID=$(gh api -X POST "$R" -f tag_name=android-build -f name="Android būvējums (nepublicēts)" -F draft=true \
+                 -f body="Automātisks APK būvējums testēšanai. Nav publicēts." --jq .id)
+          fi
+          for a in $(gh api "$R/$ID/assets" --jq '.[].id'); do gh api -X DELETE "$R/assets/$a"; done
+          curl -sSf -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$RUNNER_TEMP/RTU-estudijas.apk" \
+            "https://uploads.github.com/$R/$ID/assets?name=RTU-estudijas.apk" > /dev/null
+          echo "APK saglabāts melnrakstā $ID (versija 1.0.$GITHUB_RUN_NUMBER)"
