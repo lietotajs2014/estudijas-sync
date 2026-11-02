@@ -283,7 +283,8 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
             gcal_changes = gcal.sync(cfg, state, cal, by_id, now)
         except Exception as e:
             log.exception("Google Calendar")
-            warnings.append(f"Google Calendar: {e}")
+            from .gcal import friendly_error
+            warnings.append(f"Google Calendar: {friendly_error(e)}")
 
     from . import changes as chg
     ch = chg.compute(state, now, by_id, moodle, text_dl, result.texts, report)

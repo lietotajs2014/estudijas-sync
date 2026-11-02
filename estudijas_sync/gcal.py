@@ -19,6 +19,24 @@ class GCalNotAuthorized(Exception):
     pass
 
 
+def friendly_error(e: Exception) -> str:
+    """Saprotams paskaidrojums biežākajām Google API kļūdām."""
+    import re
+    text = str(e)
+    if "accessNotConfigured" in text or "has not been used in project" in text:
+        m = re.search(r"project[= ](\d+)", text)
+        link = ("https://console.developers.google.com/apis/api/calendar-json.googleapis.com/overview"
+                + (f"?project={m.group(1)}" if m else ""))
+        return (f"Google Cloud projektā nav ieslēgts Google Calendar API. Atver {link}, spied 'Enable', "
+                "pagaidi 1–2 minūtes un mēģini vēlreiz.")
+    if "invalid_grant" in text:
+        return "Google Calendar savienojums beidzies. Panelī spied 'Savienot ar Google'."
+    if "access_denied" in text:
+        return ("Google liedza piekļuvi. Pārbaudi, vai tavs Gmail ir pievienots kā Test user "
+                "(Google Auth Platform → Audience → Test users).")
+    return text
+
+
 def get_service(cfg: Config, interactive: bool = False):
     try:
         from google.auth.transport.requests import Request

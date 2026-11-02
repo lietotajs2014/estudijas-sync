@@ -198,8 +198,13 @@ class App:
         from . import gcal
         cfg = self.cfg()
         st = State(cfg.data_dir / "state.json")
-        svc = gcal.get_service(cfg, interactive=True)
-        cid = gcal.ensure_calendar(svc, cfg, st)
+        try:
+            svc = gcal.get_service(cfg, interactive=True)
+            cid = gcal.ensure_calendar(svc, cfg, st)
+        except gcal.GCalNotAuthorized:
+            raise
+        except Exception as e:
+            raise RuntimeError(gcal.friendly_error(e)) from e
         st.save()
         set_toml_values(cfg.config_path, {("calendar", "google"): True})
         return f"Google Calendar savienots (kalendārs '{cfg.google_calendar_name}', {cid})."
