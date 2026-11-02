@@ -153,6 +153,55 @@ class MainActivity : Activity() {
             }
         }
 
+        /**
+         * Pieslēdz web lapu (piem. https://estudijas.lodelo.de): nosūta e-studiju un Microsoft pieteikšanās
+         * sīkdatnes uz <server>/api/pair kopā ar 6 ciparu kodu no lapas. Parole netiek sūtīta (lietotnei tās nav).
+         * Rezultāts — window.__pairResult(id, ok, message).
+         */
+        @JavascriptInterface
+        fun pairWeb(id: String, server: String, code: String) {
+            pool.execute {
+                var ok = false
+                var msg: String
+                try {
+                    val base = URL(server.trimEnd('/'))
+                    if (base.protocol != "https") throw SecurityException("Servera adresei jāsākas ar https://")
+                    val cm = CookieManager.getInstance()
+                    val cookies = org.json.JSONArray()
+                    for ((host, domain) in listOf(
+                        "https://$SITE_HOST/" to SITE_HOST,
+                        "https://login.microsoftonline.com/" to "login.microsoftonline.com",
+                    )) {
+                        cm.getCookie(host)?.split(";")?.forEach { part ->
+                            val i = part.indexOf('=')
+                            if (i > 0) cookies.put(JSONObject()
+                                .put("name", part.substring(0, i).trim())
+                                .put("value", part.substring(i + 1).trim())
+                                .put("domain", domain).put("path", "/"))
+                        }
+                    }
+                    val body = JSONObject().put("code", code).put("source", "android").put("cookies", cookies).toString()
+                    val c = URL(base, "/api/pair").openConnection() as HttpURLConnection
+                    c.requestMethod = "POST"
+                    c.connectTimeout = 20_000
+                    c.readTimeout = 60_000
+                    c.doOutput = true
+                    c.setRequestProperty("Content-Type", "application/json")
+                    c.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    val status = c.responseCode
+                    val text = (if (status >= 400) c.errorStream else c.inputStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                    c.disconnect()
+                    val j = try { JSONObject(text) } catch (e: Exception) { JSONObject() }
+                    ok = j.optBoolean("ok", false)
+                    msg = if (ok) j.optString("fullname").ifEmpty { j.optString("account") }
+                          else j.optString("error").ifEmpty { "Serveris atbildēja ar kļūdu (HTTP $status)" }
+                } catch (e: Exception) {
+                    msg = e.message ?: e.javaClass.simpleName
+                }
+                js("window.__pairResult && window.__pairResult(${q(id)}, $ok, ${q(msg)})")
+            }
+        }
+
         @JavascriptInterface
         fun load(key: String): String? = Store.load(this@MainActivity, key)
 

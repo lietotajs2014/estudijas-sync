@@ -97,3 +97,93 @@ def inspect_account(site: str, token: str) -> dict:
     api.s.close()
     guess = detect_identity(group_names + [c["short"] for c in courses])
     return {"userid": userid, "fullname": info.get("fullname", ""), "courses": courses, **guess}
+
+
+# ---------------------------------------------------------------- pārlūka sesija (Android / PC)
+
+ALLOWED_COOKIE_DOMAINS = ("rtu.lv", "microsoftonline.com", "microsoft.com", "live.com")
+_COOKIE_NAME = re.compile(r"^[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128}$")
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+
+
+def normalize_cookies(raw, site: str) -> list[dict]:
+    """Pieņem sīkdatnes no PC programmas (Playwright formāts) vai Android (name/value/domain)
+    un atstāj tikai RTU un Microsoft pieteikšanās domēnu sīkdatnes Playwright formātā."""
+    if not isinstance(raw, list):
+        raise LinkError("Nepareizs sīkdatņu formāts.")
+    site_host = re.sub(r"^https?://", "", site).split("/")[0]
+    out, seen = [], set()
+    for c in raw[:300]:
+        if not isinstance(c, dict):
+            continue
+        name, value = str(c.get("name", "")), str(c.get("value", ""))
+        domain = str(c.get("domain") or site_host).strip()
+        if not _COOKIE_NAME.match(name) or len(value) > 8192 or not domain:
+            continue
+        bare = domain.lstrip(".").lower()
+        if not any(bare == d or bare.endswith("." + d) for d in ALLOWED_COOKIE_DOMAINS):
+            continue
+        key = (name, domain, c.get("path") or "/")
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            expires = float(c.get("expires", -1))
+        except (TypeError, ValueError):
+            expires = -1
+        out.append({"name": name, "value": value, "domain": domain, "path": str(c.get("path") or "/"),
+                    "expires": expires, "httpOnly": bool(c.get("httpOnly", True)),
+                    "secure": bool(c.get("secure", True)), "sameSite": "Lax"})
+    if not any(c["name"].startswith("MoodleSession") for c in out):
+        raise LinkError("Nav e-studiju sesijas. Vispirms piesakies e-studijās lietotnē/programmā.")
+    return out
+
+
+def inspect_session(site: str, cookies: list[dict]) -> dict:
+    """Pārbauda, vai sesija ir derīga, un savāc datus programmas/grupas noteikšanai (bez pārlūka)."""
+    import requests
+
+    s = requests.Session()
+    s.headers["User-Agent"] = UA
+    for c in cookies:
+        s.cookies.set(c["name"], c["value"], domain=c["domain"], path=c["path"])
+    try:
+        r = s.get(f"{site}/my/", timeout=30, allow_redirects=True)
+    except Exception as e:
+        raise LinkError(f"Neizdevās sazināties ar e-studijām: {e}") from e
+    m = re.search(r'"sesskey":"([A-Za-z0-9]+)"', r.text)
+    if not r.url.startswith(site) or "/login/" in r.url or not m:
+        raise LinkError("E-studiju sesija vairs nav derīga. Piesakies lietotnē/programmā no jauna un mēģini vēlreiz.")
+    sesskey = m.group(1)
+    um = re.search(r'data-userid="(\d+)"', r.text)
+    nm = re.search(r'class="[^"]*usertext[^"]*"[^>]*>\s*([^<]+?)\s*<', r.text)
+    userid = int(um.group(1)) if um else None
+
+    def ajax(method: str, args: dict):
+        rr = s.post(f"{site}/lib/ajax/service.php?sesskey={sesskey}&info={method}",
+                    json=[{"index": 0, "methodname": method, "args": args}], timeout=30)
+        j = rr.json()
+        if not isinstance(j, list) or j[0].get("error"):
+            raise MoodleError(f"{method} nav pieejams")
+        return j[0].get("data")
+
+    courses, group_names = [], []
+    try:
+        data = ajax("core_course_get_enrolled_courses_by_timeline_classification",
+                    {"offset": 0, "limit": 0, "classification": "inprogress", "sort": "fullname"})
+        courses = [{"id": int(c["id"]), "name": c.get("fullname", ""), "short": c.get("shortname", ""), "groups": []}
+                   for c in (data or {}).get("courses", [])]
+    except Exception:
+        pass
+    if userid:
+        for c in courses:
+            try:
+                g = ajax("core_group_get_course_user_groups", {"courseid": c["id"], "userid": userid})
+                c["groups"] = [x.get("name", "") for x in (g or {}).get("groups", [])]
+                group_names += c["groups"]
+            except Exception:
+                break   # ja nav atļauts vienam kursam, nebūs arī pārējiem
+    s.close()
+    guess = detect_identity(group_names + [c["short"] for c in courses] + [c["name"] for c in courses])
+    return {"userid": userid, "fullname": (nm.group(1).strip() if nm else ""), "courses": courses, **guess}

@@ -62,11 +62,19 @@ class User(Base):
 
 
 class MoodleLink(Base):
-    """E-studiju (Moodle mobilās lietotnes) žetons. Parole netiek glabāta nekad."""
+    """E-studiju piekļuve. Parole netiek glabāta nekad.
+
+    mode="api": Moodle mobilās lietotnes žetons (token_enc).
+    mode="web": pārlūka sesijas sīkdatnes (cookies_enc, JSON), ko atsūtīja Android lietotne vai PC programma
+                pēc tam, kad lietotājs tur pieteicās ar Microsoft. Abi lauki šifrēti.
+    """
     __tablename__ = "moodle_links"
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    token_enc: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(10), default="api")
+    token_enc: Mapped[str] = mapped_column(Text, default="")
+    cookies_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="")   # android / pc / token
     privatetoken_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
     moodle_userid: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fullname: Mapped[str] = mapped_column(String(200), default="")
@@ -89,6 +97,17 @@ class GoogleLink(Base):
     user: Mapped[User] = relationship(back_populates="google")
 
 
+class PairingCode(Base):
+    """Īslaicīgs kods, ar kuru Android lietotne vai PC programma piesaista e-studiju sesiju šim kontam."""
+    __tablename__ = "pairing_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    expires: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 engine = create_engine(settings.database_url, pool_pre_ping=True,
                        connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {})
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
@@ -99,6 +118,36 @@ def init_db() -> None:
         from pathlib import Path
         Path(settings.database_url.removeprefix("sqlite:///")).parent.mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
+    _add_missing_columns()
+
+
+# Vienkāršas migrācijas: jaunas kolonnas esošām tabulām (create_all tās nepievieno).
+_NEW_COLUMNS = {
+    "moodle_links": {
+        "mode": "VARCHAR(10) DEFAULT 'api' NOT NULL",
+        "cookies_enc": "TEXT",
+        "source": "VARCHAR(20) DEFAULT '' NOT NULL",
+    },
+}
+
+
+def _add_missing_columns() -> None:
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    for table, cols in _NEW_COLUMNS.items():
+        if not insp.has_table(table):
+            continue
+        have = {c["name"] for c in insp.get_columns(table)}
+        for name, ddl in cols.items():
+            if name in have:
+                continue
+            try:
+                with engine.begin() as conn:   # tabulu/kolonnu nosaukumi ir konstantes, ne lietotāja ievade
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+            except Exception:
+                # web un worker startējas vienlaicīgi — otrs varēja kolonnu jau pievienot
+                if name not in {c["name"] for c in inspect(engine).get_columns(table)}:
+                    raise
 
 
 def get_db():

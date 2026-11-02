@@ -136,6 +136,20 @@ window.__onLogin = (ok, err) => {
   render(); showTab("deadlines");
   runSync(true);
 };
+// Web lapa (estudijas.lodelo.de): lapā redzamais 6 ciparu kods → lietotne nosūta e-studiju sesiju serverim.
+const WEB_SERVER = "https://estudijas.lodelo.de";
+function pairWeb() {
+  const code = (prompt("Ievadi kodu, ko redzi web lapā (" + WEB_SERVER.replace("https://", "") + "):") || "").replace(/\D/g, "");
+  if (!code) return;
+  if (code.length !== 6) { toast("Kodam jābūt 6 cipariem", true); return; }
+  toast("Pieslēdz web lapu…");
+  N.pairWeb("pair" + Date.now(), WEB_SERVER, code);
+}
+window.__pairResult = (_id, ok, msg) => {
+  if (ok) toast("Web lapa pieslēgta" + (msg ? " (" + msg + ")" : "") + ". Atgriezies lapā.");
+  else toast(msg || "Neizdevās pieslēgt", true);
+};
+
 function logout() {
   S.auth = null; S.view = null; S.news = null;
   store.set("auth", null); store.set("view", null); store.set("news", null);
@@ -362,7 +376,8 @@ function renderSettings() {
   if (S.auth) {
     acc.append(el("p", {}, "Pieslēdzies kā ", el("b", { text: (S.view && S.view.user) || "…" })),
       el("div", { class: "btns" }, el("button", { class: "btn ghost", type: "button", onclick: login, text: "Pieslēgties no jauna" }),
-        el("button", { class: "btn danger", type: "button", onclick: () => { if (confirm("Atslēgties un izdzēst datus no šī telefona?")) logout(); }, text: "Atslēgties" })));
+        el("button", { class: "btn danger", type: "button", onclick: () => { if (confirm("Atslēgties un izdzēst datus no šī telefona?")) logout(); }, text: "Atslēgties" })),
+      N && N.pairWeb ? el("div", { class: "btns" }, el("button", { class: "btn wide", type: "button", onclick: pairWeb, text: "Pieslēgt web lapai" })) : null);
   } else acc.append(el("button", { class: "btn wide", type: "button", onclick: login, text: "Pieslēgties" }));
   $("#version").textContent = "Versija " + (N && N.version ? N.version() : "web");
   const w = (S.view && S.view.warnings) || [];

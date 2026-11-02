@@ -530,6 +530,13 @@ def make_handler(app: App):
                     return self._json({"ok": True, **r})
                 if u.path == "/api/credentials":
                     return self._json({"ok": True, "path": app.save_credentials(str(body.get("content", "")))})
+                if u.path == "/api/pair":
+                    from .pair import DEFAULT_SERVER, PairError, pair
+                    try:
+                        res = pair(app.cfg(), str(body.get("code", "")), str(body.get("server") or DEFAULT_SERVER))
+                    except PairError as e:
+                        return self._json({"ok": False, "error": str(e)}, 400)
+                    return self._json({"ok": True, **res})
                 if u.path == "/api/logout":
                     from .config import auth_path
                     auth_path(app.cfg()).unlink(missing_ok=True)

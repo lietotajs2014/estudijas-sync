@@ -115,6 +115,9 @@ def main(argv: list[str] | None = None) -> int:
     wp.add_argument("--no-browser", action="store_true")
     ip = sub.add_parser("import-auth", help="iekopēt auth.json no cita datora (piem., Android/Termux)")
     ip.add_argument("file")
+    pp = sub.add_parser("pair", help="pieslēgt web lapu (estudijas.lodelo.de) ar kodu no lapas")
+    pp.add_argument("code", help="6 ciparu kods no web lapas")
+    pp.add_argument("--server", default=None, help="web lapas adrese (noklusējums https://estudijas.lodelo.de)")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.profile, Path(args.config).expanduser() if args.config else None)
@@ -145,6 +148,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"✖ {e}")
             return 2
         print(f"\nRežīms: {auth['mode']}. Tagad palaid: python run.py --profile {cfg.profile} sync")
+        return 0
+
+    if args.cmd == "pair":
+        from .pair import DEFAULT_SERVER, PairError, pair
+        try:
+            res = pair(cfg, args.code, args.server or DEFAULT_SERVER)
+        except PairError as e:
+            print(f"✖  {e}")
+            return 1
+        print(f"✔  Web lapa pieslēgta ({res.get('fullname') or res.get('account')}). Atgriezies lapā.")
         return 0
 
     if args.cmd == "web":

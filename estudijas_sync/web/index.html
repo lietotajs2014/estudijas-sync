@@ -1255,6 +1255,19 @@ function renderAccount() {
           if (!confirm("Izdzēst saglabāto piekļuvi šajā datorā?")) return;
           await post("/api/logout"); toast("Piekļuve izdzēsta"); loadStatus(); renderDeadlines();
         } }, "Aizmirst piekļuvi")));
+    const code = el("input", { type: "text", inputmode: "numeric", placeholder: "123 456", maxlength: "7", style: "max-width:9em" });
+    const pairBtn = el("button", { class: "btn", type: "button", onclick: async () => {
+      pairBtn.disabled = true;
+      try {
+        const r = await post("/api/pair", { code: code.value });
+        toast(`Web lapa pieslēgta (${r.fullname || r.account || "ok"}). Atgriezies lapā.`);
+        code.value = "";
+      } catch (e) { toast(e.message, true); }
+      pairBtn.disabled = false;
+    } }, "Pieslēgt");
+    kids.push(el("h4", { text: "Web lapa", style: "margin-top:1.2em" }),
+      el("p", { class: "note", text: "Lai estudijas.lodelo.de varētu sinhronizēt tavā vietā: lapā spied “Izveidot savienošanas kodu” un ievadi to šeit. Tiek nosūtīta tikai e-studiju sesija, nevis parole." }),
+      el("div", { class: "row" }, code, pairBtn));
   }
   box.replaceChildren(...kids);
 }

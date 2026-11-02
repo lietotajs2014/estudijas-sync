@@ -1,4 +1,4 @@
-# Servera versija (Docker). Bez Playwright — serverī pārlūka pieteikšanās nav.
+# Servera versija (Docker). Playwright — sinhronizācijai ar pārlūka sesiju (Android/PC savienošana).
 requests>=2.31
 beautifulsoup4>=4.12
 tzdata>=2024.1
@@ -12,3 +12,4 @@ itsdangerous>=2.2
 sqlalchemy>=2.0
 psycopg[binary]>=3.2
 cryptography>=43
+playwright>=1.45

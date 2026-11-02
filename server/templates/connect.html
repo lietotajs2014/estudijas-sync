@@ -2,34 +2,51 @@
 {% block title %}Pieslēgt e-studijas{% endblock %}
 {% block content %}
 <h1>Pieslēdz e-studijas</h1>
-<p>Lapai vajag to pašu piekļuvi, ko izmanto oficiālā Moodle lietotne (<em>mobilās lietotnes žetons</em>).
-Tava RTU parole šeit netiek ievadīta.</p>
+<p>E-studijās piesakies <strong>Android lietotnē</strong> vai <strong>PC programmā</strong>, kā līdz šim (Microsoft logs, MFA).
+Tad ar vienreizēju kodu lietotne nodod šai lapai e-studiju sesiju. Tava RTU parole uz šo serveri netiek sūtīta.</p>
 
-<div class="card">
-  <h2>1. variants: drošības atslēga</h2>
-  <ol>
-    <li>Atver <a href="{{ site }}/user/managetoken.php" target="_blank" rel="noopener">e-studijas → Preferences → Security keys</a> (piesakies kā parasti, ar MFA).</li>
-    <li>Atrodi rindu <strong>Moodle mobile web service</strong> un nokopē atslēgu (32 simboli).</li>
-    <li>Ielīmē to zemāk.</li>
-  </ol>
-  <p class="muted small">Ja šīs rindas nav, vienreiz piesakies oficiālajā Moodle lietotnē telefonā un atver lapu vēlreiz, vai izmanto 2. variantu.</p>
+{% if pair %}
+<div class="card pair" id="pair" data-status-url="/connect/status">
+  <p class="muted small">Savienošanas kods (derīgs 10 minūtes)</p>
+  <p class="code">{{ pair.code }}</p>
+  <p class="muted small" id="pair-wait">Gaidu savienojumu…</p>
 </div>
 
-<details class="card">
-  <summary><strong>2. variants: lietotnes saite (sarežģītāk)</strong></summary>
+<div class="card">
+  <h2>Android lietotnē</h2>
   <ol>
-    <li>Esot pieteicies e-studijās, atver datorā pārlūka DevTools (F12) → <em>Network</em>.</li>
-    <li>Atver <a href="{{ launch_url }}" target="_blank" rel="noopener">šo saiti</a>. Pārlūks mēģinās atvērt <code>moodlemobile://…</code>.</li>
-    <li>Network sarakstā atrodi <code>launch.php</code> → <em>Response headers</em> → <code>location</code> un nokopē visu vērtību, kas sākas ar <code>moodlemobile://token=</code>.</li>
+    <li>Atver lietotni. Ja vēl neesi pieslēdzies, <em>Iestatījumi → Pieslēgties</em>.</li>
+    <li><em>Iestatījumi → Konts</em> → <strong>Pieslēgt web lapai</strong>.</li>
+    <li>Ievadi kodu <strong>{{ pair.code }}</strong>.</li>
   </ol>
-</details>
+</div>
 
-<form method="post" action="/connect" class="card">
+<div class="card">
+  <h2>PC programmā</h2>
+  <ol>
+    <li>Palaid programmu (<code>start.bat</code>) un pārliecinies, ka esi pieteicies (<em>Iestatījumi → Pieteikties</em>).</li>
+    <li><em>Iestatījumi</em> → <strong>Web lapa</strong> → ievadi kodu → <strong>Pieslēgt</strong>.</li>
+  </ol>
+  <p class="muted small">Vai komandrindā: <code>python run.py pair {{ pair.code | replace(" ", "") }}</code></p>
+</div>
+{% else %}
+<form method="post" action="/connect/code" class="card">
   <input type="hidden" name="csrf" value="{{ csrf }}">
-  <label>Žetons vai moodlemobile:// saite
-    <input name="token" autocomplete="off" spellcheck="false" required>
-  </label>
-  <button class="btn primary">Pieslēgt</button>
-  <p class="muted small">Žetons tiek glabāts šifrēts. To jebkurā brīdī var atsaukt e-studijās (Security keys → Reset) vai šīs lapas iestatījumos.</p>
+  <button class="btn primary">Izveidot savienošanas kodu</button>
+  <p class="muted small">Kods būs derīgs 10 minūtes un der tikai vienu reizi.</p>
 </form>
+{% endif %}
+
+<details class="card">
+  <summary><strong>Ir Moodle mobilās lietotnes atslēga?</strong></summary>
+  <p class="muted small">Ja e-studijās <a href="{{ site }}/user/managetoken.php" target="_blank" rel="noopener">Preferences → Security keys</a>
+    ir rinda <em>Moodle mobile web service</em>, var ielīmēt tās atslēgu šeit (RTU šo pakalpojumu parasti nepiedāvā).</p>
+  <form method="post" action="/connect">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Atslēga vai moodlemobile:// saite
+      <input name="token" autocomplete="off" spellcheck="false" required>
+    </label>
+    <button class="btn">Pieslēgt ar atslēgu</button>
+  </form>
+</details>
 {% endblock %}

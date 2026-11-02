@@ -5,15 +5,16 @@ panelis (termiņi, ICS saite Google Calendar, Drive, "Sinhronizēt tagad").
 """
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi import Body, Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -22,8 +23,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import google_oauth
 from .crypto import encrypt
-from .db import GoogleLink, MoodleLink, User, get_db, init_db, utcnow
-from .moodle_link import LinkError, inspect_account, parse_token_input
+from .db import GoogleLink, MoodleLink, PairingCode, User, get_db, init_db, utcnow
+from .moodle_link import LinkError, inspect_account, inspect_session, normalize_cookies, parse_token_input
 from .runner import ics_path, load_view, user_dir
 from .settings import settings
 
@@ -224,12 +225,100 @@ def logout(request: Request, _=Depends(check_csrf)):
 
 # ---- e-studiju pieslēgšana
 
+PAIR_TTL = timedelta(minutes=10)
+_pair_attempts: dict[str, list[float]] = {}
+
+
+def _hash_code(code: str) -> str:
+    import hashlib
+    return hashlib.sha256(("pair:" + code).encode()).hexdigest()
+
+
+def _save_link(db: Session, user: User, info: dict, *, mode: str, source: str, token: str | None = None,
+               private: str | None = None, cookies: list[dict] | None = None) -> None:
+    detected = {k: info[k] for k in ("program", "group", "program_candidates", "group_candidates")}
+    detected["courses"] = [{"name": c["name"], "groups": c.get("groups", [])} for c in info["courses"]]
+    link = user.moodle or MoodleLink(user_id=user.id)
+    link.mode, link.source = mode, source
+    link.token_enc = encrypt(token) or ""
+    link.privatetoken_enc = encrypt(private)
+    link.cookies_enc = encrypt(json.dumps(cookies)) if cookies else None
+    link.moodle_userid, link.fullname, link.detected = info["userid"], info["fullname"] or link.fullname or "", detected
+    link.valid, link.linked = True, utcnow()
+    if not user.moodle:
+        db.add(link)
+    user.last_error = None
+    user.sync_requested = True
+    db.commit()
+
+
 @app.get("/connect", response_class=HTMLResponse)
 def connect_page(request: Request, user: User = Depends(require_user)):
-    launch = (f"{settings.moodle_site}/admin/tool/mobile/launch.php?service=moodle_mobile_app"
-              f"&passport={secrets.randbelow(9 * 10**8) + 10**8}&urlscheme=moodlemobile")
-    return render(request, "connect.html", user, flash=pop_flash(request), site=settings.moodle_site,
-                  launch_url=launch)
+    pair = request.session.get("pair")
+    if pair and datetime.fromisoformat(pair["expires"]) < datetime.now(TZ):
+        pair = request.session["pair"] = None
+    return render(request, "connect.html", user, flash=pop_flash(request), site=settings.moodle_site, pair=pair)
+
+
+@app.post("/connect/code")
+def connect_code(request: Request, _=Depends(check_csrf), user: User = Depends(require_user),
+                 db: Session = Depends(get_db)):
+    db.query(PairingCode).filter(PairingCode.user_id == user.id).delete()
+    for _try in range(20):
+        code = f"{secrets.randbelow(10**6):06d}"
+        if not db.scalar(select(PairingCode).where(PairingCode.code_hash == _hash_code(code))):
+            break
+    expires = utcnow() + PAIR_TTL
+    db.add(PairingCode(user_id=user.id, code_hash=_hash_code(code), expires=expires))
+    db.commit()
+    request.session["pair"] = {"code": f"{code[:3]} {code[3:]}", "expires": expires.astimezone(TZ).isoformat(),
+                               "started": utcnow().isoformat()}
+    return RedirectResponse("/connect", 303)
+
+
+@app.get("/connect/status")
+def connect_status(request: Request, user: User = Depends(require_user)):
+    pair = request.session.get("pair") or {}
+    link = user.moodle
+    started = datetime.fromisoformat(pair["started"]) if pair.get("started") else None
+    linked = bool(link and link.valid and started and link.linked and
+                  link.linked.replace(tzinfo=link.linked.tzinfo or started.tzinfo) >= started)
+    if linked:
+        request.session.pop("pair", None)
+        request.session.pop("confirmed", None)
+    return {"linked": linked}
+
+
+@app.post("/api/pair")
+def api_pair(request: Request, body: dict = Body(...), db: Session = Depends(get_db)):
+    """Android lietotne / PC programma: {code, cookies:[...], source}. Bez sesijas sīkdatnēm — aizsargā kods."""
+    import time as _time
+    ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+    now = _time.time()
+    hits = [t for t in _pair_attempts.get(ip, []) if now - t < 600]
+    if len(hits) >= 20:
+        return JSONResponse({"ok": False, "error": "Pārāk daudz mēģinājumu. Pagaidi 10 minūtes."}, 429)
+    _pair_attempts[ip] = hits + [now]
+    if int(request.headers.get("content-length") or 0) > 512_000:
+        return JSONResponse({"ok": False, "error": "Pārāk liels pieprasījums."}, 413)
+
+    code = "".join(ch for ch in str(body.get("code", "")) if ch.isdigit())
+    row = db.scalar(select(PairingCode).where(PairingCode.code_hash == _hash_code(code))) if len(code) == 6 else None
+    if not row or row.used or row.expires.replace(tzinfo=row.expires.tzinfo or timezone.utc) < utcnow():
+        return JSONResponse({"ok": False, "error": "Kods nav derīgs vai ir beidzies. Izveido jaunu lapā."}, 400)
+    user = db.get(User, row.user_id)
+    if not user or not settings.email_allowed(user.email):
+        return JSONResponse({"ok": False, "error": "Konts nav atrasts."}, 400)
+    source = str(body.get("source", ""))[:20] or "app"
+    try:
+        cookies = normalize_cookies(body.get("cookies"), settings.moodle_site)
+        info = inspect_session(settings.moodle_site, cookies)
+    except LinkError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, 400)
+    row.used = True
+    _save_link(db, user, info, mode="web", source=source, cookies=cookies)
+    log.info("user %s: e-studijas pieslēgtas no %s", user.id, source)
+    return {"ok": True, "fullname": info["fullname"], "account": user.email}
 
 
 @app.post("/connect")
@@ -241,15 +330,8 @@ def connect_submit(request: Request, token: str = Form(""), _=Depends(check_csrf
     except LinkError as e:
         flash(request, str(e), "err")
         return RedirectResponse("/connect", 303)
-    detected = {k: info[k] for k in ("program", "group", "program_candidates", "group_candidates")}
-    detected["courses"] = [{"name": c["name"], "groups": c.get("groups", [])} for c in info["courses"]]
-    link = user.moodle or MoodleLink(user_id=user.id)
-    link.token_enc, link.privatetoken_enc = encrypt(tok), encrypt(private)
-    link.moodle_userid, link.fullname, link.detected = info["userid"], info["fullname"], detected
-    link.valid, link.linked = True, utcnow()
-    if not user.moodle:
-        db.add(link)
-    db.commit()
+    _save_link(db, user, info, mode="api", source="token", token=tok, private=private)
+    request.session.pop("confirmed", None)
     return RedirectResponse("/confirm", 303)
 
 
@@ -331,7 +413,7 @@ def moodle_disconnect(request: Request, _=Depends(check_csrf), user: User = Depe
     if user.moodle:
         db.delete(user.moodle)
         db.commit()
-    flash(request, "E-studijas atvienotas. Žetonu atsaukt var e-studijās: Preferences → Security keys → Reset.")
+    flash(request, "E-studijas atvienotas, sesija no servera izdzēsta.")
     return RedirectResponse("/connect", 303)
 
 

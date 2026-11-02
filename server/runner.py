@@ -58,6 +58,36 @@ def build_config(user: User):
     )
 
 
+def _run_web_mode(db: Session, user: User, cfg):
+    """Pārlūka režīms: atšifrētās sīkdatnes tiek ieliktas tikai uz sinhronizācijas laiku, pēc tam
+    atjaunotās (Moodle pagarina sesiju) atkal šifrētas DB, un faili ar sīkdatnēm un pārlūka profilu dzēsti."""
+    import shutil
+
+    from estudijas_sync.sync import run_sync
+
+    from .crypto import encrypt
+
+    link = user.moodle
+    raw = decrypt(link.cookies_enc)
+    if not raw:
+        raise RuntimeError("Sesiju neizdevās atšifrēt (vai ENCRYPTION_KEY ir mainīts?).")
+    cookie_file = cfg.data_dir / "cookies.json"
+    cookie_file.write_text(raw, encoding="utf-8")
+    os.chmod(cookie_file, 0o600)
+    try:
+        return run_sync(cfg, no_calendar=True, interactive=False, auth={"mode": "web"})
+    finally:
+        try:
+            fresh = cookie_file.read_text(encoding="utf-8")
+            if fresh.strip().startswith("[") and fresh != raw:
+                link.cookies_enc = encrypt(fresh)
+                db.commit()
+        except OSError:
+            pass
+        cookie_file.unlink(missing_ok=True)
+        shutil.rmtree(cfg.data_dir / "browser", ignore_errors=True)
+
+
 def sync_user(db: Session, user: User) -> dict:
     from estudijas_sync.model import LoginRequired
     from estudijas_sync.sync import run_sync
@@ -65,17 +95,22 @@ def sync_user(db: Session, user: User) -> dict:
     link = user.moodle
     if not link or not link.valid:
         raise RuntimeError("E-studijas nav pieslēgtas.")
-    token = decrypt(link.token_enc)
-    if not token:
-        raise RuntimeError("Žetonu neizdevās atšifrēt (vai ENCRYPTION_KEY ir mainīts?).")
-    auth = {"mode": "api", "token": token, "privatetoken": decrypt(link.privatetoken_enc),
-            "userid": link.moodle_userid, "fullname": link.fullname}
     cfg = build_config(user)
     try:
-        res = run_sync(cfg, no_calendar=True, interactive=False, auth=auth)
-    except LoginRequired as e:
+        if link.mode == "web":
+            res = _run_web_mode(db, user, cfg)
+        else:
+            token = decrypt(link.token_enc)
+            if not token:
+                raise RuntimeError("Žetonu neizdevās atšifrēt (vai ENCRYPTION_KEY ir mainīts?).")
+            auth = {"mode": "api", "token": token, "privatetoken": decrypt(link.privatetoken_enc),
+                    "userid": link.moodle_userid, "fullname": link.fullname}
+            res = run_sync(cfg, no_calendar=True, interactive=False, auth=auth)
+    except LoginRequired:
         link.valid = False
-        user.last_error = f"E-studiju žetons vairs nav derīgs — pieslēdz e-studijas no jauna. ({e})"
+        how = ("Atver Android lietotni vai PC programmu, piesakies e-studijās un lapā izveido jaunu savienošanas kodu."
+               if link.mode == "web" else "Pieslēdz e-studijas no jauna.")
+        user.last_error = f"E-studiju piekļuve beigusies. {how}"
         user.last_sync = datetime.now(timezone.utc)
         db.commit()
         raise

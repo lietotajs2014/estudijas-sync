@@ -17,7 +17,7 @@
 </div>
 
 {% if user.moodle and not user.moodle.valid %}
-  <div class="flash err">E-studiju piekļuve beigusies. <a href="/connect">Pieslēdz no jauna</a>.</div>
+  <div class="flash err">{{ user.last_error or "E-studiju piekļuve beigusies." }} <a href="/connect">Pieslēgt no jauna</a>.</div>
 {% elif user.last_error %}
   <div class="flash err">{{ user.last_error }}</div>
 {% endif %}

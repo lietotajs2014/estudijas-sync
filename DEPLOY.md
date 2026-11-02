@@ -126,9 +126,11 @@ python -m pytest tests                   # testi
 
 ## Drošība īsumā
 
-- RTU parole serverī **nekad** netiek ievadīta: lietotājs iedod Moodle mobilās lietotnes žetonu.
-- Moodle un Google žetoni DB glabājas šifrēti (Fernet, atslēga tikai `.env`). Sinhronizējot žetons
-  tiek atšifrēts tikai atmiņā — uz diska tas netiek rakstīts.
+- RTU parole serverī **nekad** netiek ievadīta. Lietotājs piesakās e-studijās Android lietotnē vai PC programmā,
+  un tā ar vienreizēju 6 ciparu kodu (derīgs 10 min) nosūta serverim e-studiju sesijas sīkdatnes.
+- Sesija un Google žetoni DB glabājas šifrēti (Fernet, atslēga tikai `.env`). Sinhronizējot sesija uz laiku
+  tiek ielikta worker konteinerī, pēc tam atjaunotā versija atkal šifrēta DB un faili izdzēsti.
+- Ja sesija beidzas (Microsoft prasa pieteikties no jauna), lapa to parāda, un jāizveido jauns kods.
 - Google: pieteikšanās tikai `openid email profile`; Drive — `drive.file` (redz tikai pašas izveidotos failus).
 - Visi DB vaicājumi caur SQLAlchemy ORM (parametrizēti) — SQL injection pret to nedarbojas.
 - Sīkdatnes `HttpOnly`, `Secure`, `SameSite=Lax`; formām CSRF žetons; stingrs CSP, bez inline skriptiem.

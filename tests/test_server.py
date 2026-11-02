@@ -134,3 +134,105 @@ def test_build_config(monkeypatch):
     assert cfg.program == "RMCE0" and cfg.my_groups == ["2"]
     assert not cfg.notify and not cfg.login_popup and not cfg.google and cfg.ics
     assert cfg.data_dir == cfg.output_dir / ".estudijas-sync"
+
+
+def test_normalize_cookies():
+    from server.moodle_link import normalize_cookies
+    raw = [{"name": "MoodleSession", "value": "abc", "domain": "estudijas.rtu.lv"},
+           {"name": "ESTSAUTHPERSISTENT", "value": "x", "domain": "login.microsoftonline.com"},
+           {"name": "evil", "value": "y", "domain": "example.com"},
+           {"name": "bad name", "value": "z", "domain": "rtu.lv"}]
+    out = normalize_cookies(raw, SITE)
+    assert [c["name"] for c in out] == ["MoodleSession", "ESTSAUTHPERSISTENT"]
+    with pytest.raises(LinkError):
+        normalize_cookies([{"name": "x", "value": "1", "domain": "rtu.lv"}], SITE)
+    with pytest.raises(LinkError):
+        normalize_cookies("nav saraksts", SITE)
+
+
+def test_pairing_flow(client, monkeypatch):
+    _login(client, monkeypatch, sub="g-pair")
+    page = client.get("/connect")
+    assert "Izveidot savienošanas kodu" in page.text
+    client.post("/connect/code", data={"csrf": _csrf(page.text)})
+    page = client.get("/connect")
+    code = re.search(r'class="code">(\d{3} \d{3})<', page.text).group(1)
+    assert client.get("/connect/status").json() == {"linked": False}
+
+    monkeypatch.setattr(appmod, "inspect_session", lambda site, cookies: {
+        "userid": 5, "fullname": "Anna", "courses": [], "program": "RMCE0", "group": "3",
+        "program_candidates": ["RMCE0"], "group_candidates": ["3"]})
+    cookies = [{"name": "MoodleSession", "value": "sess123", "domain": "estudijas.rtu.lv"}]
+    # nepareizs kods
+    r = client.post("/api/pair", json={"code": "000000", "cookies": cookies, "source": "android"})
+    assert r.status_code == 400 and not r.json()["ok"]
+    # pareizs kods (ar atstarpi, kā lapā)
+    r = client.post("/api/pair", json={"code": code, "cookies": cookies, "source": "android"})
+    assert r.json() == {"ok": True, "fullname": "Anna", "account": "students@example.com"}
+    # otrreiz nedrīkst
+    assert client.post("/api/pair", json={"code": code, "cookies": cookies}).status_code == 400
+
+    assert client.get("/connect/status").json() == {"linked": True}
+    with SessionLocal() as db:
+        u = db.query(User).filter_by(google_sub="g-pair").one()
+        assert u.moodle.mode == "web" and u.moodle.source == "android" and u.sync_requested
+        assert "sess123" not in u.moodle.cookies_enc and "sess123" in decrypt(u.moodle.cookies_enc)
+    assert 'value="RMCE0"' in client.get("/confirm").text
+
+
+def test_web_mode_runner(monkeypatch):
+    import json as _json
+
+    from server import runner
+    from server.crypto import encrypt as enc
+    from server.db import MoodleLink
+
+    seen = {}
+
+    def fake_run_sync(cfg, **kw):
+        f = cfg.data_dir / "cookies.json"
+        seen["cookies"] = _json.loads(f.read_text())
+        seen["auth"] = kw.get("auth")
+        f.write_text(_json.dumps(seen["cookies"] + [{"name": "new", "value": "1", "domain": "rtu.lv"}]))
+        return {"courses": 1, "deadlines": 2, "warning_list": []}
+
+    monkeypatch.setattr("estudijas_sync.sync.run_sync", fake_run_sync)
+    with SessionLocal() as db:
+        u = User(google_sub="g-run", email="students@example.com", program="RMCE0", group="3")
+        db.add(u)
+        db.flush()
+        db.add(MoodleLink(user_id=u.id, mode="web", token_enc="",
+                          cookies_enc=enc(_json.dumps([{"name": "MoodleSession", "value": "s", "domain": "estudijas.rtu.lv"}]))))
+        db.commit()
+        res = runner.sync_user(db, u)
+        assert res["deadlines"] == 2 and seen["auth"] == {"mode": "web"}
+        assert seen["cookies"][0]["value"] == "s"
+        cfg = runner.build_config(u)
+        assert not (cfg.data_dir / "cookies.json").exists()          # sīkdatnes uz diska neatstājam
+        assert "new" in decrypt(u.moodle.cookies_enc)                 # atjaunotās saglabātas DB
+
+
+def test_pc_pair_module(monkeypatch, tmp_path):
+    import json as _json
+
+    from estudijas_sync import pair as pairmod
+
+    class Cfg:
+        data_dir = tmp_path
+    (tmp_path / "cookies.json").write_text(_json.dumps([
+        {"name": "MoodleSession", "value": "s", "domain": "estudijas.rtu.lv"},
+        {"name": "other", "value": "x", "domain": "google.com"}]))
+    sent = {}
+
+    class R:
+        status_code = 200
+
+        def json(self):
+            return {"ok": True, "fullname": "Anna"}
+
+    monkeypatch.setattr(pairmod.requests, "post", lambda url, json, timeout: (sent.update(url=url, body=json), R())[1])
+    assert pairmod.pair(Cfg, "123 456")["fullname"] == "Anna"
+    assert sent["url"] == "https://estudijas.lodelo.de/api/pair" and sent["body"]["code"] == "123456"
+    assert [c["name"] for c in sent["body"]["cookies"]] == ["MoodleSession"]
+    with pytest.raises(pairmod.PairError):
+        pairmod.pair(Cfg, "12")

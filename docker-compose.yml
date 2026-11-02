@@ -39,6 +39,7 @@ services:
     build: .
     restart: unless-stopped
     command: ["python", "-m", "server.worker"]
+    shm_size: "1gb"               # Chromium sinhronizācijai pārlūka režīmā
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://estudijas:${POSTGRES_PASSWORD}@db:5432/estudijas

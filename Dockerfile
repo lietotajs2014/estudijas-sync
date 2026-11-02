@@ -2,11 +2,14 @@
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    DATA_DIR=/data ESTUDIJAS_SYNC_HOME=/data/app_home TZ=Europe/Riga
+    DATA_DIR=/data ESTUDIJAS_SYNC_HOME=/data/app_home TZ=Europe/Riga \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 WORKDIR /app
 COPY requirements-server.txt .
-RUN pip install --no-cache-dir -r requirements-server.txt
+RUN pip install --no-cache-dir -r requirements-server.txt \
+ && python -m playwright install --with-deps chromium \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY estudijas_sync ./estudijas_sync
 COPY server ./server
