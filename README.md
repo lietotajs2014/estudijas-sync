@@ -12,6 +12,8 @@
 
 Visu var redzēt un vadīt **web panelī** pārlūkā. Panelis darbojas tikai tavā datorā.
 
+Telefonam ir atsevišķa **[Android lietotne](#android-lietotne)**: termiņi, konsultācijas un faili, kas atveras pārlūkā (telefonā nekas netiek lejupielādēts).
+
 Paroli programma nekur neglabā. Tu piesakies ar RTU kontu parastā Microsoft logā (arī ar MFA kodu), un pēc tam programma izmanto to pašu piekļuvi, ko oficiālā Moodle lietotne.
 
 ---
@@ -142,6 +144,27 @@ Google Calendar draugam: vai nu pievieno viņa Gmail kā Test user un iedod savu
 
 ---
 
+## Android lietotne
+
+Lietotne strādā patstāvīgi, dators tai nav vajadzīgs. Tā rāda:
+
+- **termiņus** ar statusu (iesniegts / nav iesniegts / nokavēts), 2 nedēļu laika joslu un pagājušos termiņus pa mēnešiem;
+- **konsultācijas** un pasniedzēju e-pastus;
+- **failus** pa kursiem ar meklēšanu un filtriem. Faili netiek lejupielādēti: piespiežot "Atvērt dokumentu", tas atveras pārlūkā vai PDF/Word lietotnē;
+- **jaunumus** kopš iepriekšējās sinhronizācijas.
+
+**Instalēšana:**
+
+1. Telefonā atver repozitorija lapu → **Releases** → *Android lietotne (jaunākā)* → lejupielādē **RTU-estudijas.apk**. Repozitorijs ir privāts, tāpēc jābūt ielogotam GitHub ar kontu, kam ir piekļuve.
+2. Atver lejupielādēto failu. Ja Android jautā, atļauj instalēt lietotnes no šī avota (pārlūka).
+3. Lietotnē ieraksti programmu (piem. `RMCE0`) un grupu, spied **Pieslēgties** un ielogojies ar RTU kontu (Microsoft, ar MFA kodu).
+
+Jaunāku versiju instalē tāpat, virsū vecajai, un dati saglabājas. Katru reizi, kad repozitorijā mainās `android/` mape, GitHub Actions automātiski uzbūvē jaunu APK.
+
+Sinhronizācija notiek, atverot lietotni (ja pēdējā bija pirms 30+ minūtēm), vai ar pogu augšā. Termiņu var ielikt telefona kalendārā ar pogu "Pievienot kalendāram". Automātiskais Google Calendar 2× dienā joprojām nāk no datora programmas.
+
+---
+
 ## Problēmas
 
 - **Žurnāls**: panelī cilne *Help*, kā arī `<mape>\.estudijas-sync\sync.log`.
@@ -170,6 +193,6 @@ Visu var darīt arī bez paneļa, mapē `estudijas-sync`:
 | `python run.py update` | atjaunina no GitHub |
 | `python run.py --profile janis …` | otrs konts tajā pašā datorā |
 
-**Telefons (Android, Termux):** programmu var darbināt arī Termux un lejupielādēt tikai mājasdarbus (`only_categories = ["Mājas darbi"]`). Pieteikšanos izdara datorā un uz telefonu ar `python run.py import-auth auth.json` pārnes `auth.json`. Vienkāršāk ir lietot Google Drive kopēšanu.
+**Termux (Android):** ja tomēr vajag lejupielādēt failus telefonā, programmu var darbināt Termux (`only_categories = ["Mājas darbi"]`, pieteikšanās ar `python run.py import-auth auth.json`). Parasti pietiek ar [Android lietotni](#android-lietotne).
 
 Privātuma politika: [PRIVACY.md](PRIVACY.md).
