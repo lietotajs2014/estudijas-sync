@@ -3,9 +3,20 @@ __pycache__/
 *.zip
 .venv/
 venv/
-# Personīgie dati glabājas ~/.estudijas_sync, nevis šeit — bet drošības pēc:
+
+# Personīgie dati glabājas izvades mapē (<mape>/.estudijas-sync), nevis šeit.
+# Drošības pēc — ja kāds izvades mapi tomēr izvēlas repozitorija iekšienē:
+.estudijas-sync/
 auth.json
 google_token.json
 credentials.json
+client_secret*.json
 state.json
 cookies.json
+view.json
+catalog.json
+config.toml
+sync.log*
+UZDEVUMI.md
+JAUNUMI.md
+termini.ics

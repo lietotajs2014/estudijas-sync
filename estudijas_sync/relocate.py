@@ -87,6 +87,12 @@ def change_folder(cfg: Config, new_dir: str, mode: str = "move") -> dict:
             raise ValueError("Jaunā mape nevar būt vecās mapes iekšienē")
     except OSError:
         pass
+    project = Path(__file__).resolve().parent.parent
+    try:
+        if new.resolve() == project or project in new.resolve().parents:
+            raise ValueError("Neizvēlies mapi programmas (git repozitorija) iekšienē — tur nedrīkst glabāt personīgos datus.")
+    except OSError:
+        pass
     new.mkdir(parents=True, exist_ok=True)
     test = new / ".estudijas_test"
     try:
