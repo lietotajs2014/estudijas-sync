@@ -47,6 +47,7 @@ class FileItem:
     page_url: str = ""
     kind_hint: str = ""  # piem. uzdevuma veids (MD/KD) pielikumiem
     modified: int | None = None  # Moodle timemodified (ja zināms)
+    created: int | None = None   # kad ielikts estudijās (Moodle timecreated, ja zināms)
 
     @property
     def key(self) -> str:

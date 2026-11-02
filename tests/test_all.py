@@ -192,7 +192,10 @@ def test_full_sync(tmp_path=None):
     c = out / "Elektrotehnikas pamati"
     assert (c / "Lekcijas" / "01_L1 Omu likums.pptx").exists()
     assert (c / "Mājas darbi" / "MD materiāli" / "sagataves" / "MD1.pdf").exists()
-    assert (c / "Mājas darbi" / "MD1_uzdevumi.pdf").exists()
+    att = list(c.glob("Mājas darbi/MD1 — Kirhofa likumi (līdz *)/MD1_uzdevumi.pdf"))
+    assert len(att) == 1, list(c.rglob("*"))
+    assert (att[0].parent / "Atvērt uzdevumu estudijās.url").exists()
+    old_folder = att[0].parent.name
     assert not any("video" in x for x in downloads)
     assert (c / "Laboratorijas darbi" / "LD1.pdf").exists() and downloads.count("LD1.pdf") == 1   # tikai RMCE0 3. gr.
     dg = (out / "UZDEVUMI.md").read_text(encoding="utf-8")
@@ -228,8 +231,13 @@ def test_full_sync(tmp_path=None):
             return {"lastattempt": {"submission": {"status": "submitted"}},
                     "feedback": {"gradefordisplay": "9 / 10"}}
         return orig_call(self, fn, **kw)
+    responses["mod_assign_get_assignments"]["courses"][0]["assignments"][0]["duedate"] += 7 * 86400
     moodle_api.MoodleAPI.call = call_graded
     r3 = syncmod.run_sync(cfg)
+    moved = list(c.glob("Mājas darbi/MD1 — Kirhofa likumi (līdz *)/MD1_uzdevumi.pdf"))
+    assert len(moved) == 1 and moved[0].parent.name != old_folder, moved
+    assert not (c / "Mājas darbi" / old_folder).exists()
+    assert "MD1_uzdevumi.pdf" in (c / "_info" / "Uzdevumi un testi.md").read_text(encoding="utf-8")
     assert r3["updated"] == 1, r3
     t = r3["changes_text"]
     print(t)

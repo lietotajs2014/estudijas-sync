@@ -28,6 +28,8 @@ Panelī ir:
   - Kārtošana: jaunākie, pa kursiem, pēc nosaukuma, pēc izmēra.
   - **Vairāku failu izvēle**: atzīmē rūtiņas vai "Atzīmēt redzamos" un spied **"Lejupielādēt atzīmētos"**. Tā var lejupielādēt arī failus, kas pēc iestatījumiem tiktu izlaisti.
   - Katram failam ir pogas "Atvērt" un "Parādīt mapē", kas atver Explorer ar iezīmētu failu.
+  - Katram failam redzams, kad tas ielikts estudijās, un kārtas numurs kursā (#1 ir pirmais ieliktais). Ja failam ir termiņš, redzama saite uz to, kā arī saite uz estudiju lapu, no kuras fails nāk.
+  - Uzdevumu dokumenti tiek likti uzdevuma mapē ar termiņu nosaukumā, piemēram, `Mājas darbi/MD1 — Kirhofa likumi (līdz 05.11.)/`. Turpat ir saīsne "Atvērt uzdevumu estudijās". Ja pasniedzējs termiņu pārceļ, mape tiek pārdēvēta automātiski.
 - **Iestatījumi**:
   - e-pasts, programma, grupa;
   - izvades mape ar izvēles logu un lejupielādējamās kategorijas;
@@ -58,6 +60,7 @@ RTU estudijas/
 └── Elektrotehnikas pamati/
     ├── Lekcijas/              ← 01_Lekcija1.pptx, 02_... (numurs = kursa sadaļa)
     ├── Mājas darbi/
+    │   └── MD1 — Kirhofa likumi (līdz 05.11.)/   ← uzdevuma dokumenti + "Atvērt uzdevumu estudijās.url"
     ├── Kontroldarbi/
     ├── Laboratorijas darbi/
     ├── Praktiskie darbi/

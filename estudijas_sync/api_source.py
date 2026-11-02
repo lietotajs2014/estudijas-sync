@@ -148,7 +148,8 @@ class ApiSource:
                             modtype=mod, filename=f.get("filename", "fails"), url=f["fileurl"],
                             version=str(f.get("timemodified") or f.get("fileurl")), cmid=m.get("id", 0),
                             subpath=(f.get("filepath") or "/").strip("/") if mod == "folder" else "",
-                            size=f.get("filesize"), page_url=murl, modified=f.get("timemodified")))
+                            size=f.get("filesize"), page_url=murl, modified=f.get("timemodified"),
+                            created=f.get("timecreated") or f.get("timemodified")))
                     if desc:
                         res.texts.append(TextBlock(c.id, f"{secname} — {mname}", desc, murl, "sadaļa"))
                 elif mod == "page":
@@ -201,7 +202,8 @@ class ApiSource:
                         course_id=cid, section=sec or "Uzdevumi", section_num=0, module=name, modtype="assign",
                         filename=att.get("filename", "pielikums"), url=att["fileurl"],
                         version=str(att.get("timemodified") or att["fileurl"]), cmid=a["cmid"],
-                        size=att.get("filesize"), page_url=url, kind_hint=kind, modified=att.get("timemodified")))
+                        size=att.get("filesize"), page_url=url, kind_hint=kind, modified=att.get("timemodified"),
+                        created=att.get("timecreated") or att.get("timemodified")))
                 if not due:
                     continue
                 status = None

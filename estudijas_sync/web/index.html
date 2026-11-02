@@ -211,7 +211,9 @@ button.title:hover { text-decoration: underline; }
 .ftable td.c { width: 30px; }
 .ftable td.name b { font-weight: 600; display: block; overflow-wrap: anywhere; }
 .ftable td.name small { color: var(--ink-soft); display: block; }
-.ftable .fdl { font-size: 13px; text-decoration: none; margin-top: 2px; }
+.ftable .flinks { display: flex; gap: 4px 14px; flex-wrap: wrap; margin-top: 2px; }
+.ftable .fdl { font-size: 13px; text-decoration: none; }
+a.fdl { color: var(--md); }
 .ftable .fdl.ok { color: var(--ok); } .ftable .fdl.bad { color: var(--bad); }
 .ftable tr.sel { background: color-mix(in srgb, var(--md) 9%, transparent); }
 .ftable td.act { white-space: nowrap; text-align: right; }
@@ -875,6 +877,8 @@ const fui = { course: "", dl: "", status: "open", q: "", cats: new Set() };
 function fileDeadlines() {
   const map = new Map(), now = new Date();
   const score = d => { const t = new Date(d.due); return t >= now ? t - now : 1e13 + (now - t); };
+  const byUid = new Map((VIEW.deadlines || []).map(d => [d.uid, d]));
+  for (const f of FD.files || []) if (f.deadline_uid && byUid.has(f.deadline_uid)) map.set(f.key, { d: byUid.get(f.deadline_uid), direct: true });
   for (const d of [...(VIEW.deadlines || [])].sort((a, b) => score(a) - score(b))) {
     const m = /^cm-(\d+)$/.exec(d.uid || "");
     for (const f of relatedFiles(d)) {
@@ -902,7 +906,8 @@ function fileWhy(f) {
     big: "lielāks par atļauto izmēru", error: "lejupielāde neizdevās", pending: "vēl nav lejupielādēts" }[f.status] || "";
 }
 function fileTime(f) {
-  return f.modified > 1e9 ? new Date(f.modified * 1000).toISOString() : (f.first_seen || f.downloaded_at || "");
+  const t = f.created > 1e9 ? f.created : f.modified > 1e9 ? f.modified : 0;
+  return t ? new Date(t * 1000).toISOString() : (f.first_seen || f.downloaded_at || "");
 }
 function fmtSize(n) { return n == null ? "" : n < 1048576 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`; }
 function relatedFiles(d) {
@@ -974,7 +979,14 @@ function visibleFiles() {
     return fileTime(b).localeCompare(fileTime(a));
   });
 }
-function fileRow(f, fdl) {
+function uploadSeq() {
+  const seq = new Map(), byCourse = new Map();
+  for (const f of FD.files || []) { if (!byCourse.has(f.course_id)) byCourse.set(f.course_id, []); byCourse.get(f.course_id).push(f); }
+  for (const list of byCourse.values())
+    list.sort((a, b) => fileTime(a).localeCompare(fileTime(b))).forEach((f, i) => seq.set(f.key, i + 1));
+  return seq;
+}
+function fileRow(f, fdl, seq) {
   const st = fileState(f);
   const link = fdl && fdl.get(f.key);
   const cb = el("input", { type: "checkbox", "aria-label": `Atzīmēt ${f.filename}`, checked: sel.has(f.key),
@@ -986,11 +998,15 @@ function fileRow(f, fdl) {
   const tr = el("tr", { class: sel.has(f.key) ? "sel" : "" },
     el("td", { class: "c" }, cb),
     el("td", { class: "name" }, el("b", { text: f.filename }), el("small", { text: [f.module !== f.filename ? f.module : "", f.section].filter(Boolean).join(", ") }),
-      link ? el("button", { class: "linkish fdl" + (link.d.done ? " ok" : new Date(link.d.due) < new Date() && link.d.status ? " bad" : ""), type: "button",
-        onclick: () => openDeadline(link.d), text: `${link.d.kind}: ${link.d.title}, ${fmtDate(link.d.due, false)}${link.d.done ? " ✓" : ""}` }) : null),
+      el("span", { class: "flinks" },
+        link ? el("button", { class: "linkish fdl" + (link.d.done ? " ok" : new Date(link.d.due) < new Date() && link.d.status ? " bad" : ""), type: "button",
+          onclick: () => openDeadline(link.d), text: `Termiņš: ${link.d.kind} ${link.d.title}, ${fmtDate(link.d.due, false)}${link.d.done ? " ✓" : ""}` }) : null,
+        f.page_url ? el("a", { class: "fdl", href: f.page_url, target: "_blank", rel: "noopener",
+          text: f.modtype === "assign" ? "uzdevums estudijās" : "avots estudijās" }) : null)),
     el("td", { class: "hide-m", text: f.course }),
     el("td", { class: "hide-m", text: f.category }),
-    el("td", { class: "hide-m", text: fileTime(f) ? fmtDate(fileTime(f), false) : "" }),
+    el("td", { class: "hide-m", title: "Kad ielikts estudijās (kārtas nr. kursā)" },
+      fileTime(f) ? fmtDate(fileTime(f), false) : "", seq && seq.get(f.key) ? el("small", { class: "muted", text: ` #${seq.get(f.key)}` }) : null),
     el("td", { class: "hide-m", text: fmtSize(f.size) }),
     el("td", {}, el("span", { class: "st " + st, title: fileWhy(f), text: ST_LABEL[st] })),
     el("td", { class: "act" }, act));
@@ -1002,17 +1018,17 @@ function renderFiles() {
   const rows = visibleFiles();
   if (!rows.length) { box.append(el("div", { class: "empty", text: "Nekas neatbilst filtriem." })); updateBulk(); return; }
   const body = el("tbody");
-  const fdl = fileDeadlines();
+  const fdl = fileDeadlines(), seq = uploadSeq();
   let lastCourse = null;
   for (const f of rows.slice(0, 600)) {
     if (f.course_full !== lastCourse) {
       lastCourse = f.course_full;
       body.append(el("tr", { class: "course-head" }, el("td", { colspan: 8, text: f.course_full || f.course })));
     }
-    body.append(fileRow(f, fdl));
+    body.append(fileRow(f, fdl, seq));
   }
   box.append(el("table", { class: "ftable" }, el("thead", {}, el("tr", {}, el("th", {}), el("th", { text: "Fails" }),
-    el("th", { class: "hide-m", text: "Kurss" }), el("th", { class: "hide-m", text: "Tips" }), el("th", { class: "hide-m", text: "Datums" }),
+    el("th", { class: "hide-m", text: "Kurss" }), el("th", { class: "hide-m", text: "Tips" }), el("th", { class: "hide-m", text: "Ielikts" }),
     el("th", { class: "hide-m", text: "Izmērs" }), el("th", { text: "Statuss" }), el("th", {}))), body));
   if (rows.length > 600) box.append(el("p", { class: "note", text: `Rādīti 600 no ${rows.length}. Sašaurini filtrus.` }));
   updateBulk();

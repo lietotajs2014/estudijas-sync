@@ -165,7 +165,7 @@ def write_banner(out: Path, message: str) -> None:
 # ------------------------------------------------------------------
 def write_course_info(out: Path, course: Course, dirname: str, deadlines: list[Deadline],
                       texts: list[TextBlock], links: list[Link], groups: list[str],
-                      others: list[Deadline] | None = None) -> None:
+                      others: list[Deadline] | None = None, files: list[dict] | None = None) -> None:
     info = out / dirname / "_info"
     info.mkdir(parents=True, exist_ok=True)
 
@@ -179,6 +179,10 @@ def write_course_info(out: Path, course: Course, dirname: str, deadlines: list[D
             L.append(f"- Statuss: {d.status}")
         if d.url:
             L.append(f"- Saite: {d.url}")
+        mine = [f for f in files or [] if f.get("deadline_uid") == d.uid]
+        if mine:
+            L.append("- Faili: " + ", ".join(
+                f"[{f['filename']}](<../{f['path'].split('/', 1)[1] if '/' in f['path'] else f['path']}>)" for f in mine))
         if d.details:
             L += ["", d.details.strip()]
         L.append("")

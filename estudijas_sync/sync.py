@@ -72,20 +72,58 @@ def describe_filter(cfg: Config, matchers: dict[int, Matcher]) -> str:
     return ", ".join(parts)
 
 
-def plan_path(cfg: Config, item: FileItem, course_dir: Path, cats) -> tuple[str, Path]:
+def assignment_folder(name: str, due: datetime | None) -> str:
+    """Uzdevuma mape ar termiņu nosaukumā, piem. "MD1 — Kirhofa likumi (līdz 05.11.)"."""
+    base = sanitize(name, 70)
+    return sanitize(f"{base} (līdz {due:%d.%m.})", 90) if due else base
+
+
+def plan_path(cfg: Config, item: FileItem, course_dir: Path, cats, dues: dict | None = None) -> tuple[str, Path]:
     cat = classify_file(item, cats)
     fname = sanitize(item.filename, 120)
     if cat == "Lekcijas" and item.modtype == "resource":
         fname = f"{item.section_num:02d}_{fname}"
     parts = [course_dir, Path(sanitize(cat))]
+    if item.modtype == "assign":
+        parts.append(Path(assignment_folder(item.module, (dues or {}).get(f"cm-{item.cmid}"))))
     if item.modtype == "folder":
         parts.append(Path(sanitize(item.module, 60)))
         parts += [Path(sanitize(p, 60)) for p in item.subpath.split("/") if p]
     return cat, Path(*parts) / fname
 
 
+def _shortcut(path: Path, url: str) -> None:
+    """Windows interneta saīsne (.url) — dubultklikšķis atver saiti pārlūkā."""
+    from .util import write_if_changed
+    try:
+        write_if_changed(path, f"[InternetShortcut]\r\nURL={url}\r\n")
+    except OSError:
+        pass
+
+
+def _relocate(out: Path, old_rel: str, new_rel: str) -> bool:
+    """Pārvieto jau lejupielādētu failu uz jauno vietu (piem., mainījies termiņš uzdevuma mapes nosaukumā)."""
+    import shutil
+    src, dst = out / old_rel, out / new_rel
+    if not src.exists() or dst.exists():
+        return False
+    try:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(src), str(dst))
+        old_dir = src.parent
+        for leftover in old_dir.glob("*.url"):
+            leftover.unlink(missing_ok=True)
+        while old_dir != out and old_dir.exists() and not any(old_dir.iterdir()):
+            old_dir.rmdir()
+            old_dir = old_dir.parent
+        return True
+    except OSError:
+        return False
+
+
 def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, Path], state: State,
-               redownload: bool = False, matchers: dict[int, Matcher] | None = None, prog=None) -> dict:
+               redownload: bool = False, matchers: dict[int, Matcher] | None = None, prog=None,
+               dues: dict | None = None) -> dict:
     """Lejupielādē jaunos/mainītos failus un atgriež arī pilnu katalogu (visi estudiju faili ar statusu)."""
     prog = prog or NullProgress()
     cats = compile_categories(cfg.categories)
@@ -102,7 +140,7 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
         cdir = course_dirs.get(item.course_id)
         if cdir is None:
             continue
-        cat, path = plan_path(cfg, item, cdir, cats)
+        cat, path = plan_path(cfg, item, cdir, cats, dues)
         status = None
         m = matchers.get(item.course_id)
         is_other = bool(m and cfg.other_groups != "keep" and
@@ -117,8 +155,17 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
         rel = path.relative_to(out).as_posix()
         first_seen.setdefault(item.key, now_iso)
         entry = state.files.get(item.key)
+        # jau lejupielādēts, bet plānotā vieta mainījusies (piem., termiņš mapes nosaukumā) — pārvieto
+        if entry and entry.get("path") and entry["path"] != rel and entry.get("version") == item.version:
+            if _relocate(out, entry["path"], rel):
+                entry["path"] = rel
+                report.setdefault("moved", []).append(rel)
+        if item.modtype == "assign" and item.page_url and entry and (out / entry.get("path", "")).exists():
+            _shortcut((out / entry["path"]).parent / "Atvērt uzdevumu estudijās.url", item.page_url)
         row = {"key": item.key, "course_id": item.course_id, "category": cat, "filename": item.filename,
                "module": item.module, "section": item.section, "modtype": item.modtype, "cmid": str(item.cmid),
+               "page_url": item.page_url, "created": item.created,
+               "deadline_uid": f"cm-{item.cmid}" if item.modtype == "assign" else None,
                "size": item.size, "modified": item.modified, "first_seen": first_seen[item.key],
                "path": (entry or {}).get("path") or rel, "planned": rel, "other_group": is_other,
                "downloaded_at": (entry or {}).get("downloaded")}
@@ -159,6 +206,8 @@ def sync_files(cfg: Config, src, files: list[FileItem], course_dirs: dict[int, P
                 continue
             state.files[item.key] = {"version": item.version, "path": rel, "downloaded": now_iso}
             row.update(status="downloaded", path=rel, downloaded_at=now_iso)
+            if item.modtype == "assign" and item.page_url:
+                _shortcut(path.parent / "Atvērt uzdevumu estudijās.url", item.page_url)
             report["updated" if entry else "new"].append(rel)
             log.info("%s: %s", "atjaunināts" if entry else "jauns", rel)
             prog.advance(item.filename)
@@ -201,6 +250,8 @@ def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool
             try:
                 src.download(item, cfg.output_dir / rel, on_bytes=prog.add_bytes)
                 state.files[item.key] = {"version": item.version, "path": rel, "downloaded": now_iso, "manual": True}
+                if item.modtype == "assign" and item.page_url:
+                    _shortcut((cfg.output_dir / rel).parent / "Atvērt uzdevumu estudijās.url", item.page_url)
                 done.append(rel)
             except LoginRequired:
                 raise
@@ -247,7 +298,8 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
         course_dirs = {cid: out / n for cid, n in names.items()}
         matchers = {c.id: Matcher.build(cfg.program, cfg.group, cfg.my_groups, result.groups.get(c.id, []),
                                         cfg.other_program_pattern or None) for c in courses}
-        report = sync_files(cfg, src, result.files, course_dirs, state, redownload, matchers, prog)
+        dues = {uid: d.due for uid, d in result.deadlines.items()}
+        report = sync_files(cfg, src, result.files, course_dirs, state, redownload, matchers, prog, dues)
 
     by_id = {c.id: c for c in courses}
     window = list(result.deadlines.values())  # visi zināmie termiņi (kursi ir tikai pašreizējie)
@@ -273,7 +325,8 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
         write_course_info(out, c, names[c.id], [d for d in moodle if d.course_id == c.id],
                           [t for t in result.texts if t.course_id == c.id],
                           [ln for ln in result.links if ln.course_id == c.id], result.groups.get(c.id, []),
-                          [d for d in others if d.course_id == c.id])
+                          [d for d in others if d.course_id == c.id],
+                          [r for r in report.get("catalog", []) if r["course_id"] == c.id and r.get("status") == "downloaded"])
 
     cal = list(moodle) + [d for d in consult_events if keep_all or d.relevance != OTHER]
     if cfg.include_text_dates:
