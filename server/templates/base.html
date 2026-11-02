@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="lv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}RTU estudijas{% endblock %} · estudijas-sync</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">estudijas<span>·sync</span></a>
+  {% if user %}
+  <nav>
+    <a href="/">Panelis</a>
+    <a href="/settings">Iestatījumi</a>
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Iziet</button>
+    </form>
+  </nav>
+  {% endif %}
+</header>
+<main>
+  {% if flash %}<div class="flash {{ flash.kind }}">{{ flash.msg }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer><a href="/privacy">Privātums</a> · estudijas-sync</footer>
+</body>
+</html>

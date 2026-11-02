@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Iestatījumi{% endblock %}
+{% block content %}
+<h1>Iestatījumi</h1>
+<form method="post" action="/settings" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Kas tu esi</h2>
+  <div class="row">
+    <label>Programma <input name="program" value="{{ user.program }}"></label>
+    <label>Grupa <input name="group" value="{{ user.group }}"></label>
+  </div>
+  <label>Rādīt arī šīs grupas <input name="extra_groups" value="{{ (user.extra_groups or []) | join(', ') }}"></label>
+  <label>Izlaist kursus (nosaukuma daļas, ar komatu) <input name="exclude_courses" value="{{ (user.exclude_courses or []) | join(', ') }}"></label>
+  <h2>Google Drive</h2>
+  {% if user.google %}
+  <label class="check"><input type="checkbox" name="drive_enabled" value="1" {{ 'checked' if user.drive_enabled }}> Augšupielādēt failus Drive mapē “RTU estudijas”</label>
+  <label>Kategorijas <input name="drive_categories" value="{{ (user.drive_categories or []) | join(', ') }}"></label>
+  {% else %}
+  <input type="hidden" name="drive_categories" value="{{ (user.drive_categories or []) | join(', ') }}">
+  <p class="muted">Drive nav pieslēgts.</p>
+  {% endif %}
+  <button class="btn primary">Saglabāt</button>
+</form>
+
+<div class="card actions">
+  {% if user.google %}
+  <form method="post" action="/settings/drive/disconnect"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Atvienot Google Drive</button></form>
+  {% else %}
+  <form method="post" action="/settings/drive/connect"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn primary">Pieslēgt Google Drive</button></form>
+  {% endif %}
+  <form method="post" action="/settings/ics/reset"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Nomainīt kalendāra saiti</button></form>
+  <form method="post" action="/settings/moodle/disconnect"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">Atvienot e-studijas</button></form>
+</div>
+
+<div class="card">
+  <h2>Kalendāra saite</h2>
+  <div class="copy"><input readonly value="{{ ics_url }}" id="ics"><button class="btn" data-copy="ics">Kopēt</button></div>
+</div>
+
+<form method="post" action="/settings/delete" class="card danger">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <h2>Dzēst kontu</h2>
+  <p>Izdzēš žetonus, iestatījumus un visus serverī saglabātos failus. Ieraksti <strong>dzēst</strong>:</p>
+  <div class="copy"><input name="confirm" autocomplete="off"><button class="btn bad">Dzēst</button></div>
+</form>
+{% endblock %}

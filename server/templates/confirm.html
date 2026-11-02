@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Kas tu esi{% endblock %}
+{% block content %}
+<h1>Sveiks, {{ fullname }}!</h1>
+<p>Pēc tavām e-studiju grupām izskatās, ka tu esi:</p>
+<form method="post" action="/confirm" class="card">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <div class="row">
+    <label>Programma / plūsma
+      <input name="program" value="{{ program }}" placeholder="piem. RMCE0" list="progs">
+      <datalist id="progs">{% for p in det.program_candidates or [] %}<option value="{{ p }}">{% endfor %}</datalist>
+    </label>
+    <label>Grupa
+      <input name="group" value="{{ group }}" placeholder="piem. 3" list="grps">
+      <datalist id="grps">{% for g in det.group_candidates or [] %}<option value="{{ g }}">{% endfor %}</datalist>
+    </label>
+  </div>
+  <label>Rādīt arī citas grupas (neobligāti, atdalīt ar komatu)
+    <input name="extra_groups" placeholder="piem. 2">
+  </label>
+  <button class="btn primary">Pareizi, sākt</button>
+  {% if not program %}<p class="flash err">Programmu automātiski noteikt neizdevās — ieraksti pats.</p>{% endif %}
+</form>
+{% if det.courses %}
+<details class="card">
+  <summary>Kursi un grupas, ko atradām ({{ det.courses | length }})</summary>
+  <ul class="small">
+  {% for c in det.courses %}<li>{{ c.name }}{% if c.groups %} — <span class="muted">{{ c.groups | join(", ") }}</span>{% endif %}</li>{% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}

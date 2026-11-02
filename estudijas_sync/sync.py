@@ -29,8 +29,9 @@ def run_lock(cfg: Config):
     return file_lock(cfg.data_dir / "sync.lock")
 
 
-def make_source(cfg: Config, interactive: bool = True, prog=None):
-    auth = load_auth(cfg)
+def make_source(cfg: Config, interactive: bool = True, prog=None, auth: dict | None = None):
+    """auth: ja padots (serverī — no šifrētas DB), auth.json netiek lasīts."""
+    auth = auth or load_auth(cfg)
     if not auth:
         raise LoginRequired("Nav pieteikšanās datu.")
     if auth.get("mode") == "api" and auth.get("token"):
@@ -234,7 +235,7 @@ def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool
     state = State(cfg.data_dir / "state.json")
     done, errors = [], []
     now_iso = datetime.now().isoformat(timespec="seconds")
-    with run_lock(cfg), make_source(cfg, interactive, prog) as src:
+    with run_lock(cfg), make_source(cfg, interactive, prog, auth) as src:
         prog.start("Lejupielādē atzīmētos", len(picked), sum(i.size or 0 for i, _ in picked))
         for item, rel in picked:
             prog.label(item.filename)
@@ -266,7 +267,7 @@ def download_selected(cfg: Config, keys: list[str], prog=None, interactive: bool
 
 
 def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None,
-             interactive: bool = True) -> dict:
+             interactive: bool = True, auth: dict | None = None) -> dict:
     prog = prog or NullProgress()
     tz = ZoneInfo(cfg.timezone)
     now = datetime.now(tz)
@@ -274,7 +275,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     out = cfg.output_dir
     out.mkdir(parents=True, exist_ok=True)
 
-    with run_lock(cfg), make_source(cfg, interactive, prog) as src:
+    with run_lock(cfg), make_source(cfg, interactive, prog, auth) as src:
         prog.note(f"Pieslēdzas estudijām ({src.name} režīms)…")
         info = src.site_info()
         courses = filter_courses(src.courses(), cfg)

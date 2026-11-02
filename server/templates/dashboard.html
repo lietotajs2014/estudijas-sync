@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Panelis{% endblock %}
+{% block content %}
+<div class="bar">
+  <div>
+    <h1>{{ user.moodle.fullname or user.name }}</h1>
+    <p class="muted">{{ user.program }}{% if user.group %}, {{ user.group }}. grupa{% endif %}
+      · pēdējā sinhronizācija:
+      {% if user.last_sync %}{{ user.last_sync.astimezone(now.tzinfo).strftime("%d.%m. %H:%M") }}{% else %}vēl nav{% endif %}
+      {% if user.sync_requested %}<span class="pill">rindā…</span>{% endif %}
+    </p>
+  </div>
+  <form method="post" action="/sync">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn">Sinhronizēt tagad</button>
+  </form>
+</div>
+
+{% if user.moodle and not user.moodle.valid %}
+  <div class="flash err">E-studiju piekļuve beigusies. <a href="/connect">Pieslēdz no jauna</a>.</div>
+{% elif user.last_error %}
+  <div class="flash err">{{ user.last_error }}</div>
+{% endif %}
+{% for w in (user.last_result or {}).get("warning_list", []) %}<div class="flash warn">{{ w }}</div>{% endfor %}
+
+{% if overdue %}
+<h2>Nokavēti / neiesniegti</h2>
+<ul class="dl">
+{% for d in overdue %}
+  <li class="late"><time>{{ d.due_dt.strftime("%d.%m. %H:%M") }}</time>
+    <span class="kind">{{ d.kind }}</span>
+    <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
+    <span class="muted">{{ d.course }}</span>
+    {% if d.status %}<span class="status">{{ d.status }}</span>{% endif %}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+<h2>Nākamās 30 dienas</h2>
+{% if upcoming %}
+<ul class="dl">
+{% for d in upcoming %}
+  <li class="{{ 'done' if d.done else '' }}"><time>{{ d.due_dt.strftime("%d.%m. %H:%M") }}</time>
+    <span class="kind">{{ d.kind }}</span>
+    <a href="{{ d.url }}" target="_blank" rel="noopener">{{ d.title }}</a>
+    <span class="muted">{{ d.course }}</span>
+    {% if d.status %}<span class="status">{{ d.status }}</span>{% endif %}</li>
+{% endfor %}
+</ul>
+{% elif not view %}
+<p class="muted">Dati vēl nav savākti. Pirmā sinhronizācija var aizņemt dažas minūtes.</p>
+{% else %}
+<p class="muted">Tuvāko 30 dienu laikā termiņu nav.</p>
+{% endif %}
+
+<div class="card">
+  <h2>Google Calendar</h2>
+  <p>Google Calendar → <em>Citi kalendāri</em> → <strong>+</strong> → <em>No URL</em> → ielīmē:</p>
+  <div class="copy"><input readonly value="{{ ics_url }}" id="ics"><button class="btn" data-copy="ics">Kopēt</button></div>
+  <p class="muted small">Saite ir slepena — nedod to citiem. Google kalendāru atjauno pats ik pēc dažām stundām.</p>
+</div>
+{% endblock %}

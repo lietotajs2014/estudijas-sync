@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Visi e-studiju termiņi vienuviet</h1>
+  <p>Termiņi tavā Google kalendārā, mājasdarbu faili tavā Google Drive. Atlasīti tieši tavai programmai un grupai.</p>
+  {% if missing %}
+    <div class="flash err">Serveris vēl nav iestatīts: {{ missing | join(", ") }}.</div>
+  {% else %}
+    <a class="btn primary" href="/login">Pieteikties ar Google</a>
+  {% endif %}
+  <p class="muted small">Piekļuve tikai uzaicinātajiem. RTU paroli šī lapa neprasa un neglabā.</p>
+</section>
+{% endblock %}

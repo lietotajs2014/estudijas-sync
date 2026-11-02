@@ -32,3 +32,10 @@ android/keystore.properties
 *.apk
 .idea/
 android/test/node_modules/
+
+# Serveris
+.env
+data/
+backups/
+deploy/nginx/certs/*.pem
+deploy/nginx/certs/*.key

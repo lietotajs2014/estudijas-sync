@@ -14,6 +14,8 @@ Visu var redzēt un vadīt **web panelī** pārlūkā. Panelis darbojas tikai ta
 
 Telefonam ir atsevišķa **[Android lietotne](#android-lietotne)**: termiņi, konsultācijas un faili, kas atveras pārlūkā (telefonā nekas netiek lejupielādēts).
 
+> **Web versija (dev zarā):** vairāku lietotāju lapa `estudijas.lodelo.de` — sk. [DEPLOY.md](DEPLOY.md).
+
 Paroli programma nekur neglabā. Tu piesakies ar RTU kontu parastā Microsoft logā (arī ar MFA kodu), un pēc tam programma izmanto to pašu piekļuvi, ko oficiālā Moodle lietotne.
 
 ---
