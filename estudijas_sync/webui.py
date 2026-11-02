@@ -524,8 +524,10 @@ def make_handler(app: App):
                     if app.job:
                         return self._json({"ok": False, "error": f"Pagaidi, kamēr beigsies: {app.job['name']}"}, 409)
                     from .relocate import change_folder
-                    return self._json({"ok": True, **change_folder(app.cfg(), str(body.get("path", "")),
-                                                                    str(body.get("mode", "move")))})
+                    r = change_folder(app.cfg(), str(body.get("path", "")), str(body.get("mode", "move")))
+                    from .cli import setup_logging
+                    setup_logging(app.cfg())  # žurnāls tagad jaunajā mapē
+                    return self._json({"ok": True, **r})
                 if u.path == "/api/credentials":
                     return self._json({"ok": True, "path": app.save_credentials(str(body.get("content", "")))})
                 if u.path == "/api/logout":

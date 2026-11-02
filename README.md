@@ -111,7 +111,9 @@ python run.py install-schedule   # turpmāk 07:30 un 19:30 automātiski
 
 To pašu var izdarīt web panelī: `python run.py web` vai `start.bat`.
 
-Konfigurācija atrodas `~/.estudijas_sync/default/config.toml` (Windows: `C:\Users\<tu>\.estudijas_sync\default\config.toml`). Tajā var iestatīt:
+**Viss ir vienā mapē**, kas norādīta iestatījumos (pēc noklusējuma `Dokumenti\RTU estudijas`). Tur ir lejupielādētie materiāli, `UZDEVUMI.md` un slēpta apakšmape `.estudijas-sync` ar skripta datiem: `config.toml`, pieteikšanās, žurnāls un pārlūka profils. Mainot mapi, arī šie dati pārvietojas līdzi. `C:\Users\<tu>\.estudijas_sync` paliek tikai mazs fails ar norādi, kur šī mape atrodas.
+
+Konfigurācija ir `<mape>/.estudijas-sync/config.toml`, un panelī to atver poga "Atvērt config.toml". Tajā var iestatīt:
 
 - `output_dir` — kur likt failus. Mapi ērtāk mainīt panelī (*Iestatījumi → Mape → Izvēlēties…*) vai ar `python run.py set-folder`, jo tad jau lejupielādētos failus var pārvietot uz jauno vietu;
 - `exclude_courses` — kursus, kurus nevajag;
@@ -151,7 +153,7 @@ Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skri
 
 1. [console.cloud.google.com](https://console.cloud.google.com/) izveido projektu → *APIs & Services* → ieslēdz **Google Calendar API**.
 2. *OAuth consent screen* izvēlies **External**. Pie *Test users* pievieno savu Gmail (un draugu Gmail, ja dalies ar to pašu projektu).
-3. *Credentials* → *Create credentials* → **OAuth client ID** → *Desktop app* → lejupielādē JSON un saglabā kā `~/.estudijas_sync/credentials.json`.
+3. *Credentials* → *Create credentials* → **OAuth client ID** → *Desktop app* → lejupielādē JSON. Panelī ar "Izvēlēties failu…" norādi, kur tas ir, vai augšupielādē to: tad tas tiek saglabāts `<mape>/.estudijas-sync/credentials.json`.
 4. Uzstādi:
    ```bash
    pip install -r requirements-google.txt
@@ -182,11 +184,11 @@ Telefonā skripts lejupielādē tikai mājas darbu dokumentus un `UZDEVUMI.md`. 
    pip install -r requirements-termux.txt
    ```
 2. Iekopē projekta mapi telefonā.
-3. Datorā pēc `login` paņem `~/.estudijas_sync/default/auth.json` un pārsūti to uz telefonu. Termux palaid:
+3. Datorā pēc `login` paņem `<mape>/.estudijas-sync/auth.json` un pārsūti to uz telefonu. Termux palaid:
    ```bash
    python run.py import-auth /sdcard/Download/auth.json
    ```
-4. `~/.estudijas_sync/default/config.toml` iestati:
+4. Telefonā `config.toml` (pēc pirmās palaišanas tā ceļu parāda `python run.py status`) iestati:
    ```toml
    output_dir = "~/storage/shared/Documents/RTU"
    only_categories = ["Mājas darbi"]
@@ -215,6 +217,7 @@ Ar draugiem dalies ar **kodu**, nevis ar saviem failiem vai `auth.json`. Katrs p
 
 ## Problēmas
 
-- Žurnāls: `~/.estudijas_sync/<profils>/sync.log`.
+- Žurnāls: `<mape>/.estudijas-sync/sync.log` (panelī cilne *Help*).
+- "Sinhronizācija jau notiek" parādās tikai tad, ja tiešām notiek cita sinhronizācija, piemēram, automātiskā. Pagaidi, kamēr tā beigsies.
 - Mainīgs fails nonāk nepareizā mapē? Papildini regulāro izteiksmi `[categories]` sadaļā.
 - Testi bez interneta: `python tests/test_all.py`.

@@ -333,8 +333,13 @@ def test_change_folder():
     assert (tmp / "new" / "Kurss" / "_info" / "Paziņojumi.md").exists() and (tmp / "new" / "UZDEVUMI.md").exists()
     assert (tmp / "old" / "mans_fails.txt").exists() and not (tmp / "old" / "Kurss").exists(), r
     assert load_config("relocate").output_dir == tmp / "new"
-    r2 = change_folder(load_config("relocate"), str(tmp / "third"), "redownload")
-    assert State(cfg.data_dir / "state.json").files == {} and load_config("relocate").output_dir == tmp / "third"
+    c2 = load_config("relocate")
+    assert c2.data_dir == tmp / "new" / ".estudijas-sync" and (c2.data_dir / "config.toml").exists()
+    r2 = change_folder(c2, str(tmp / "third"), "redownload")
+    c3 = load_config("relocate")
+    assert c3.data_dir == tmp / "third" / ".estudijas-sync" and c3.output_dir == tmp / "third"
+    assert State(c3.data_dir / "state.json").files == {}
+    assert not (tmp / "new" / ".estudijas-sync").exists()
     for bad in ("relatīvs/ceļš", str(tmp / "third" / "iekšā")):
         try:
             change_folder(load_config("relocate"), bad, "move")
@@ -354,6 +359,30 @@ def test_calendar_colors():
     assert color_for(mk(due=now - td(days=3), status="nav iesniegts"), now) == COLOR_OVERDUE
     assert color_for(mk(due=now - td(days=3), status=None, kind="Eksāmens"), now) == COLOR_PAST
     assert color_for(mk(due=now + td(days=3), status="nav iesniegts", kind="KD"), now) == "3"
+
+
+def test_lock_and_migration():
+    from estudijas_sync.config import migrate_data_dir, set_toml_values
+    from estudijas_sync.lock import AlreadyRunning, file_lock, is_locked
+    tmp = Path(tempfile.mkdtemp())
+    p = tmp / "sync.lock"
+    p.write_text("12345")            # vecs, pamests bloķēšanas fails — netraucē
+    with file_lock(p):
+        assert is_locked(p)
+        try:
+            with file_lock(p):
+                raise AssertionError("divas slēdzenes vienlaikus")
+        except AlreadyRunning:
+            pass
+    assert not is_locked(p)
+    cfg = load_config("migr")
+    set_toml_values(cfg.config_path, {(None, "output_dir"): str(tmp / "RTU")})
+    cfg = load_config("migr")
+    (cfg.data_dir / "auth.json").write_text("{}")
+    cfg2 = migrate_data_dir(cfg)
+    assert cfg2.data_dir == tmp / "RTU" / ".estudijas-sync"
+    assert (cfg2.data_dir / "auth.json").exists() and (cfg2.data_dir / "config.toml").exists()
+    assert load_config("migr").data_dir == cfg2.data_dir
 
 
 def test_webui():

@@ -62,7 +62,7 @@ ics = true                       # izvades mapē raksta termini.ics
 include_text_dates = true        # kalendārā likt arī tekstā atrastos datumus (atzīmēti ar ❓)
 reminders_minutes = [1440, 120]  # atgādinājumi: 1 diena un 2 h pirms termiņa
 google = false                   # sinhronizēt ar Google Calendar (skat. README)
-google_credentials = "~/.estudijas_sync/credentials.json"
+google_credentials = ""               # tukšs = <mape>/.estudijas-sync/credentials.json
 google_calendar_name = "RTU estudijas"
 
 [drive]

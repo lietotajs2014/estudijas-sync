@@ -4,8 +4,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import time
-from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -22,20 +20,13 @@ from .util import sanitize
 log = logging.getLogger(__name__)
 
 
-class AlreadyRunning(Exception):
-    pass
+from .lock import AlreadyRunning, file_lock  # noqa: E402  AlreadyRunning izmanto cli/webui
+
+__all__ = ["AlreadyRunning", "run_sync", "sync_with_relogin", "download_selected"]
 
 
-@contextmanager
 def run_lock(cfg: Config):
-    p = cfg.data_dir / "sync.lock"
-    if p.exists() and time.time() - p.stat().st_mtime < 2 * 3600:
-        raise AlreadyRunning(f"Sinhronizācija jau notiek (ja nē — izdzēs {p}).")
-    p.write_text(str(os.getpid()))
-    try:
-        yield
-    finally:
-        p.unlink(missing_ok=True)
+    return file_lock(cfg.data_dir / "sync.lock")
 
 
 def make_source(cfg: Config, interactive: bool = True, prog=None):

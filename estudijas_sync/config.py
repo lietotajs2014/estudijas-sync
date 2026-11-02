@@ -8,7 +8,11 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# APP_HOME glabā tikai norādi, kur atrodas profila dati. Paši dati (config.toml, pieteikšanās, žurnāls,
+# pārlūka profils) atrodas izvades mapes apakšmapē DATA_DIRNAME — viss vienuviet.
 APP_HOME = Path(os.environ.get("ESTUDIJAS_SYNC_HOME", Path.home() / ".estudijas_sync"))
+DATA_DIRNAME = ".estudijas-sync"
+LEGACY_CREDENTIALS = "~/.estudijas_sync/credentials.json"
 TEMPLATE = Path(__file__).with_name("config_template.toml")
 
 
@@ -34,6 +38,14 @@ def documents_dir() -> Path:
         except Exception:
             pass
     return Path.home() / "Documents"
+
+
+def _creds_path(raw: str | None, data_dir: Path) -> Path:
+    if raw and raw.strip() not in (LEGACY_CREDENTIALS,):
+        return _path(raw)
+    local = data_dir / "credentials.json"
+    legacy = _path(LEGACY_CREDENTIALS)
+    return legacy if (not local.exists() and legacy.exists()) else local
 
 
 def resolve_output_dir(raw: str) -> Path:
@@ -88,8 +100,80 @@ class Config:
     drive_link: str = ""
 
 
+def _pointer(profile: str) -> Path:
+    return APP_HOME / f"{profile}.location"
+
+
+def resolve_data_dir(profile: str) -> Path:
+    p = _pointer(profile)
+    if p.exists():
+        try:
+            d = Path(p.read_text(encoding="utf-8").strip())
+            if (d / "config.toml").exists():
+                return d
+        except OSError:
+            pass
+    return APP_HOME / profile  # pirmā palaišana vai vecā versija
+
+
+def _hide(path: Path) -> None:
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetFileAttributesW(str(path), 0x02)  # FILE_ATTRIBUTE_HIDDEN
+        except Exception:
+            pass
+
+
+def migrate_data_dir(cfg: "Config") -> "Config":
+    """Pārceļ profila datus uz <izvades mape>/.estudijas-sync (ja tie vēl nav tur) un atjauno norādi."""
+    import shutil
+    target = cfg.output_dir / DATA_DIRNAME
+    src = cfg.data_dir
+    try:
+        if src.resolve() == target.resolve():
+            return cfg
+    except OSError:
+        pass
+    target.mkdir(parents=True, exist_ok=True)
+    _hide(target)
+    for item in list(src.iterdir()) if src.exists() else []:
+        dst = target / item.name
+        try:
+            if dst.exists():
+                if item.is_dir():
+                    shutil.copytree(item, dst, dirs_exist_ok=True)
+                    shutil.rmtree(item, ignore_errors=True)
+                else:
+                    shutil.copy2(item, dst)
+                    item.unlink()
+            else:
+                shutil.move(str(item), str(dst))
+        except OSError:
+            # atvērts fails (piem., žurnāls) — nokopē, oriģinālu atstāj
+            try:
+                if item.is_file():
+                    shutil.copy2(item, dst)
+            except OSError:
+                pass
+    legacy_creds = Path(os.path.expanduser(LEGACY_CREDENTIALS))
+    if legacy_creds.exists() and not (target / "credentials.json").exists():
+        try:
+            shutil.copy2(legacy_creds, target / "credentials.json")
+        except OSError:
+            pass
+    APP_HOME.mkdir(parents=True, exist_ok=True)
+    _pointer(cfg.profile).write_text(str(target), encoding="utf-8")
+    try:
+        if src.exists() and not any(src.iterdir()):
+            src.rmdir()
+    except OSError:
+        pass
+    return load_config(cfg.profile)
+
+
 def load_config(profile: str = "default", path: Path | None = None) -> Config:
-    data_dir = APP_HOME / profile
+    data_dir = resolve_data_dir(profile)
     data_dir.mkdir(parents=True, exist_ok=True)
     path = path or data_dir / "config.toml"
     created = False
@@ -127,7 +211,7 @@ def load_config(profile: str = "default", path: Path | None = None) -> Config:
         include_text_dates=bool(cal.get("include_text_dates", True)),
         reminders_minutes=[int(x) for x in cal.get("reminders_minutes", [1440, 120])][:5],
         google=bool(cal.get("google", False)),
-        google_credentials=_path(cal.get("google_credentials") or str(APP_HOME / "credentials.json")),
+        google_credentials=_creds_path(cal.get("google_credentials"), data_dir),
         google_calendar_name=cal.get("google_calendar_name", "RTU estudijas"),
         categories=dict(raw["categories"]),
         email=str(raw.get("email", "")).strip(),

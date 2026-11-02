@@ -17,9 +17,13 @@ from .model import LoginRequired
 log = logging.getLogger("estudijas_sync")
 
 
-def setup_logging(cfg, verbose: bool) -> None:
+def setup_logging(cfg, verbose: bool = False) -> None:
     root = logging.getLogger()
     root.setLevel(logging.DEBUG if verbose else logging.INFO)
+    for h in list(root.handlers):  # atkārtoti izsaucot (piem., pēc mapes maiņas) — aizver veco žurnālu
+        if isinstance(h, (RotatingFileHandler, logging.StreamHandler)):
+            root.removeHandler(h)
+            h.close()
     fh = RotatingFileHandler(cfg.data_dir / "sync.log", maxBytes=1_000_000, backupCount=3, encoding="utf-8")
     fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     root.addHandler(fh)
@@ -114,6 +118,15 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     cfg = load_config(args.profile, Path(args.config).expanduser() if args.config else None)
+    if not args.config:
+        # viss vienā mapē: profila dati → <izvades mape>/.estudijas-sync (ja sinhronizācija tobrīd nenotiek)
+        from .config import migrate_data_dir
+        from .lock import is_locked
+        if not is_locked(cfg.data_dir / "sync.lock"):
+            try:
+                cfg = migrate_data_dir(cfg)
+            except OSError as e:
+                print(f"Datu mapi neizdevās pārcelt: {e}")
     setup_logging(cfg, args.verbose)
 
     if args.cmd == "init":

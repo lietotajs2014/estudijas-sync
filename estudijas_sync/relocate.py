@@ -120,7 +120,10 @@ def change_folder(cfg: Config, new_dir: str, mode: str = "move") -> dict:
             except OSError as ex:
                 failed.append(f"{rel}: {ex}")
         # iztīra tukšās mapes vecajā vietā (lietotāja failus neaiztiek)
+        from .config import DATA_DIRNAME
         for dirpath, _dirs, _files in sorted(os.walk(old), key=lambda t: -len(t[0])):
+            if DATA_DIRNAME in Path(dirpath).relative_to(old).parts:
+                continue
             try:
                 if not os.listdir(dirpath) and Path(dirpath) != old:
                     os.rmdir(dirpath)
@@ -131,6 +134,12 @@ def change_folder(cfg: Config, new_dir: str, mode: str = "move") -> dict:
         state.save()
 
     set_toml_values(cfg.config_path, {(None, "output_dir"): str(new).replace("\\", "/")})
+    # skripta dati (iestatījumi, pieteikšanās, žurnāls) pārvietojas līdzi uz <jaunā mape>/.estudijas-sync
+    from .config import load_config, migrate_data_dir
+    try:
+        migrate_data_dir(load_config(cfg.profile))
+    except OSError as ex:
+        failed.append(f"skripta dati: {ex}")
     msg = {"move": f"Mape nomainīta, pārvietoti {moved} vienumi.",
            "redownload": "Mape nomainīta. Nākamajā sinhronizācijā viss tiks lejupielādēts no jauna."}[mode]
     if failed:
