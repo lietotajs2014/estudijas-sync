@@ -51,7 +51,8 @@ def pick_file(initial: str = "") -> str | None:
 def _pick(mode: str, initial: str) -> str | None:
     init = initial if initial and Path(initial).exists() else str(Path.home() / "Downloads") \
         if (Path.home() / "Downloads").exists() and mode == "file" else str(Path.home())
-    r = subprocess.run([sys.executable, "-c", _PICKER, mode, init], capture_output=True, text=True, timeout=600,
+    r = subprocess.run([sys.executable, "-c", _PICKER, mode, init], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=600, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if r.returncode == 3:
         raise RuntimeError("Izvēles logs nav pieejams (nav tkinter). Ieraksti ceļu pats.")

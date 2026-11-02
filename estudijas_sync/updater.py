@@ -8,8 +8,11 @@ from .schedule import PROJECT_DIR
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", *args], cwd=PROJECT_DIR, capture_output=True, text=True,
-                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    # encoding=utf-8: commit ziņās ir latviešu burti; ar Windows noklusējuma kodējumu stdout būtu None
+    r = subprocess.run(["git", "-c", "core.quotepath=off", *args], cwd=PROJECT_DIR, capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    r.stdout, r.stderr = r.stdout or "", r.stderr or ""
+    return r
 
 
 def is_repo() -> bool:

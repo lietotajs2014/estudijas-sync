@@ -39,12 +39,12 @@ def status(cfg: Config) -> bool | None:
     """True/False — vai automātiskā palaišana ir iestatīta; None — nevar noteikt."""
     try:
         if platform.system() == "Windows":
-            r = subprocess.run(["schtasks", "/Query", "/TN", _task_name(cfg)], capture_output=True, text=True,
+            r = subprocess.run(["schtasks", "/Query", "/TN", _task_name(cfg)], capture_output=True, text=True, encoding="utf-8", errors="replace",
                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             return r.returncode == 0
         if not shutil.which("crontab"):
             return None
-        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+        r = subprocess.run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace")
         return r.returncode == 0 and f"# estudijas-sync:{cfg.profile}" in r.stdout
     except Exception:
         return None
@@ -54,7 +54,7 @@ def uninstall(cfg: Config) -> str:
     if platform.system() == "Windows":
         r = subprocess.run(["powershell", "-NoProfile", "-Command",
                             f"Unregister-ScheduledTask -TaskName '{_task_name(cfg)}' -Confirm:$false"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
         return "Uzdevums noņemts." if r.returncode == 0 else r.stderr.strip()
     _write_cron(cfg, [])
     return "Cron ieraksti noņemti."
@@ -76,7 +76,7 @@ def _install_windows(cfg: Config) -> str:
         f"-Description 'RTU estudiju sinhronizācija ({cfg.profile})' -Force | Out-Null",
     ])
     r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip() or r.stdout.strip())
     return (f"Windows Task Scheduler uzdevums '{_task_name(cfg)}' izveidots: {', '.join(cfg.schedule_times)}. "
@@ -99,12 +99,12 @@ def _write_cron(cfg: Config, new_lines: list[str]) -> None:
     if not shutil.which("crontab"):
         hint = "pkg install cronie termux-services && sv-enable crond" if is_termux() else "instalē cron"
         raise RuntimeError(f"Nav atrasta 'crontab' komanda ({hint}).")
-    cur = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+    cur = subprocess.run(["crontab", "-l"], capture_output=True, text=True, encoding="utf-8", errors="replace")
     existing = cur.stdout.splitlines() if cur.returncode == 0 else []
     marker = f"# estudijas-sync:{cfg.profile}"
     keep = [ln for ln in existing if not ln.rstrip().endswith(marker)]
     content = "\n".join(keep + new_lines).strip() + "\n"
-    subprocess.run(["crontab", "-"], input=content, text=True, check=True)
+    subprocess.run(["crontab", "-"], input=content, text=True, encoding="utf-8", errors="replace", check=True)
 
 
 def _install_cron(cfg: Config) -> str:
