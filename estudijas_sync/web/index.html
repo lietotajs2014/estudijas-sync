@@ -292,17 +292,30 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 html:not(.web) .web-only { display: none !important; }
 dialog#msdlg { padding: 22px 26px 24px; }
 .ms-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 4px 0 18px; font-size: 13px; color: var(--ink-soft); }
-.ms-steps li { flex: 1; display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 3px solid var(--line); }
-.ms-steps li span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); font-size: 11px; }
+.ms-steps li { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; padding-top: 8px; border-top: 3px solid var(--line); }
+.ms-steps li span { flex: none; display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line); font-size: 11px; }
 .ms-steps li.on { color: var(--ink); font-weight: 600; border-top-color: var(--ink); }
 .ms-steps li.on span { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
 .ms-steps li.ok { border-top-color: var(--ok); }
+@media (max-width: 520px) {
+  .ms-steps li { flex: 0 0 auto; font-size: 0; gap: 0; padding-right: 10px; }
+  .ms-steps li span { font-size: 11px; }
+  .ms-steps li.on { flex: 1 1 auto; font-size: 13px; gap: 6px; }
+}
 .ms-steps li.ok span { background: var(--ok); color: #fff; border-color: var(--ok); }
 .ms-go { width: 100%; padding: 11px; font-size: 16px; }
 .ms-wait { display: flex; align-items: center; gap: 12px; padding: 22px 0; color: var(--ink-soft); }
 .spin { width: 20px; height: 20px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--ink); animation: spin .8s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .ms-text { max-height: 160px; overflow: auto; font-size: 13px; }
+.rem-list { display: grid; gap: 6px; margin-bottom: 8px; }
+.rem-row { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.field .rem-row input[type=number], .rem-row input { width: 4.2em; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-s); background: var(--sheet); color: var(--ink); font: inherit; text-align: right; }
+.rem-row span { color: var(--ink-soft); font-size: 14px; }
+.rem-row .rem-x { margin-left: 4px; }
+.cal-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 14px; }
+details.ics-more { margin: 4px 0 14px; }
+details.ics-more summary { cursor: pointer; color: var(--ink-soft); font-size: 14px; }
 .ms-form { display: grid; gap: 10px; margin: 6px 0 4px; }
 .ms-form input { font: inherit; font-size: 17px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-s);
   background: var(--sheet); color: var(--ink); width: 100%; box-sizing: border-box; }
@@ -515,9 +528,10 @@ dialog#msdlg { padding: 22px 26px 24px; }
             </div>
             <div class="field pc-only"><label for="f-calname">Kalendāra nosaukums</label>
               <input type="text" id="f-calname" name="google_calendar_name"></div>
-            <div class="field"><label for="f-rem">Atgādinājumi, minūtes pirms</label>
-              <input type="text" id="f-rem" name="reminders_minutes" placeholder="1440, 120">
-              <div class="hint">1440 = diena, 120 = divas stundas</div></div>
+            <div class="field"><label>Atgādinājumi pirms termiņa</label>
+              <div class="rem-list" id="rem-list"></div>
+              <button class="btn ghost small" type="button" id="rem-add">+ Pievienot atgādinājumu</button>
+              <div class="hint">Dienas, stundas, minūtes pirms termiņa. Google kalendārā tiek likti tuvākie 5 (Google ierobežojums), līdz 28 dienām.</div></div>
           </div>
           <div class="field pc-only" style="margin-top:16px"><label for="f-creds">Google credentials.json atrašanās vieta</label>
             <div class="folder-row">
@@ -1255,16 +1269,32 @@ async function loadConfig() {
   }
   const catBox = (id, selected) => { const b = $(id); b.replaceChildren(...CONFIG.categories.map(c =>
     el("label", { class: "check" }, el("input", { type: "checkbox", value: c, checked: selected.includes(c) }), c))); };
+  renderReminders(v.reminders_minutes || []);
   if ($("#only-cats")) catBox("#only-cats", v.only_categories);
   if ($("#drive-cats")) catBox("#drive-cats", v.drive_categories);
   if ($("#f-out")) { $("#f-out").value = v.output_dir; $("#move-box").hidden = true; }
   if (!VIEW.filter) $("#st-filter").textContent = v.program ? `${v.program}, ${v.group || "?"}. gr.` : "nav norādīta";
   renderGcalRow();
 }
+/* atgādinājumi: rindas DD HH Min ↔ minūšu saraksts */
+function remRow(min = 0) {
+  const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60), m = min % 60;
+  const num = (v, max, label) => el("input", { type: "number", min: "0", max: String(max), value: String(v), inputmode: "numeric", "aria-label": label,
+    onchange: () => WEB && saveConfig() });
+  return el("div", { class: "rem-row" }, num(d, 28, "dienas"), el("span", { text: "d" }), num(h, 23, "stundas"), el("span", { text: "h" }),
+    num(m, 59, "minūtes"), el("span", { text: "min" }),
+    el("button", { class: "btn ghost small rem-x", type: "button", "aria-label": "Noņemt", onclick: e => { e.target.closest(".rem-row").remove(); WEB && saveConfig(); } }, "✕"));
+}
+function renderReminders(list) { const b = $("#rem-list"); if (b) b.replaceChildren(...[...list].sort((a, b) => b - a).map(remRow)); }
+function remValues() {
+  return $$("#rem-list .rem-row").map(r => { const [d, h, m] = $$("input", r).map(i => Math.max(0, parseInt(i.value || "0", 10) || 0));
+    return d * 1440 + Math.min(h, 23) * 60 + Math.min(m, 59); }).filter(x => x >= 0 && x <= 40320);
+}
 function formValues() {
   const f = $("#cfg-form"), out = {};
   for (const inp of $$("[name]", f)) out[inp.name] = inp.type === "checkbox" ? inp.checked
     : inp.type === "number" ? Number(inp.value) : inp.value;
+  out.reminders_minutes = [...new Set(remValues())];
   if ($("#only-cats")) out.only_categories = $$("#only-cats input:checked").map(i => i.value);
   if ($("#drive-cats")) out.drive_categories = $$("#drive-cats input:checked").map(i => i.value);
   out.exclude_courses = out.exclude_courses.split("\n").map(s => s.trim()).filter(Boolean);
@@ -1395,31 +1425,43 @@ function renderWebAccount() {
       } }, "Dzēst kontu")));
   box.replaceChildren(...kids);
 }
+const GCAL_HOME = "https://calendar.google.com/calendar/r";
+function googleBtn(label = "Pieslēgt Google") {
+  return el("button", { class: "btn small", type: "button", onclick: () => postForm("/settings/google/connect") }, label);
+}
 function renderWebPanels() {
-  const d = STATUS.drive || {}, box = $("#web-drive");
+  const d = STATUS.drive || {}, g = STATUS.gcal || {}, box = $("#web-drive");
   if (box) {
-    const chk = el("input", { type: "checkbox", name: "drive_enabled", checked: !!d.enabled, disabled: !d.connected,
-      onchange: () => saveConfig() });
     box.replaceChildren(el("h4", { text: "Google Drive" }),
-      el("p", { class: "note", text: "Faili, ko atzīmē un ielādē, tiek ielikti arī tavā Google Drive mapē “RTU estudijas” (pa kursiem). Tā tie ir telefona Drive lietotnē. Lapa redz tikai pašas izveidotos failus." }),
-      el("label", { class: "toggle" }, chk, el("span", { text: "Likt ielādētos failus Google Drive" })),
+      el("p", { class: "note", text: "Pēc katras sinhronizācijas tavā Drive ir mape “RTU estudijas” ar kursu apakšmapēm. Faili, ko atzīmē un ielādē, nonāk tur, tātad arī telefona Drive lietotnē. Lapa redz tikai pašas izveidotās mapes un failus." }),
+      el("label", { class: "toggle" }, el("input", { type: "checkbox", name: "drive_enabled", checked: !!d.enabled, disabled: !d.connected,
+        onchange: () => saveConfig().then(loadStatus) }), el("span", { text: "Likt failus Google Drive" })),
       el("div", { class: "row", style: "margin-top:10px" },
         d.connected ? el("span", { class: "pill ok", text: "Drive pieslēgts" }) : el("span", { class: "pill warn", text: "nav pieslēgts" }),
-        d.connected ? el("a", { class: "btn ghost small", href: "https://drive.google.com/drive/search?q=%22RTU%20estudijas%22", target: "_blank", rel: "noopener" }, "Atvērt Drive")
-          : el("button", { class: "btn small", type: "button", onclick: () => postForm("/settings/drive/connect") }, "Pieslēgt Google Drive"),
-        d.connected ? el("button", { class: "btn ghost small", type: "button", onclick: () => { if (confirm("Atvienot Google Drive?")) postForm("/settings/drive/disconnect"); } }, "Atvienot") : null));
+        d.connected ? el("a", { class: "btn ghost small", href: d.folder_url || "https://drive.google.com/drive/my-drive", target: "_blank", rel: "noopener" }, "Atvērt Drive mapi")
+          : googleBtn("Pieslēgt Google"),
+        STATUS.google && STATUS.google.connected ? el("button", { class: "btn ghost small", type: "button",
+          onclick: () => { if (confirm("Atvienot Google (Drive un kalendāru)?")) postForm("/settings/google/disconnect"); } }, "Atvienot Google") : null));
   }
   const cal = $("#web-cal");
   if (cal && STATUS.ics_url) {
+    const wasOpen = !!(cal.querySelector("details") || {}).open;
     const inp = el("input", { readonly: true, value: STATUS.ics_url, "aria-label": "Kalendāra saite", onfocus: e => e.target.select() });
     cal.replaceChildren(
-      el("p", { class: "note", text: "Termiņi Google Calendar: Google Calendar → Citi kalendāri → + → No URL → ielīmē šo saiti. Google to atjauno pats ik pēc dažām stundām." }),
-      el("div", { class: "copyrow" }, inp, el("button", { class: "btn small", type: "button", onclick: () => copyText(STATUS.ics_url) }, "Kopēt")),
-      el("div", { class: "row", style: "margin:10px 0 16px" },
-        el("a", { class: "btn ghost small", href: "https://calendar.google.com/calendar/r/settings/addbyurl", target: "_blank", rel: "noopener" }, "Atvērt Google Calendar"),
+      el("p", { class: "note", text: g.connected
+        ? "Termiņi tiek likti tavā Google kalendārā “RTU estudijas” pēc katras sinhronizācijas: iesniegtie zaļi, nokavētie sarkani."
+        : "Pieslēdz Google, un termiņi pēc katras sinhronizācijas paši parādīsies tavā Google kalendārā “RTU estudijas”." }),
+      el("label", { class: "toggle" }, el("input", { type: "checkbox", name: "gcal_enabled", checked: !!g.enabled, disabled: !g.connected,
+        onchange: () => saveConfig().then(loadStatus) }), el("span", { text: "Likt termiņus Google Calendar" })),
+      el("div", { class: "cal-links" },
+        g.connected ? el("span", { class: "pill ok", text: "Google Calendar pieslēgts" }) : googleBtn("Pieslēgt Google Calendar"),
+        el("a", { class: "btn small", href: GCAL_HOME, target: "_blank", rel: "noopener" }, "Atvērt kalendāru"),
+        el("a", { class: "btn ghost small", href: STATUS.ics_download || STATUS.ics_url, download: "termini.ics" }, "Lejupielādēt .ics")),
+      el("details", { class: "ics-more", open: wasOpen }, el("summary", { text: "Cits kalendārs (Outlook, Apple): abonēšanas saite" }),
+        el("div", { class: "copyrow", style: "margin-top:8px" }, inp, el("button", { class: "btn small", type: "button", onclick: () => copyText(STATUS.ics_url) }, "Kopēt")),
+        el("p", { class: "hint", text: "Saite ir slepena: kas to zina, redz tavus termiņus." }),
         el("button", { class: "btn ghost small", type: "button", onclick: () => {
-          if (confirm("Nomainīt saiti? Vecā pārstās strādāt, un jaunā būs jāpievieno Google Calendar no jauna.")) postForm("/settings/ics/reset"); } }, "Nomainīt saiti")),
-      el("p", { class: "hint", text: "Saite ir slepena: kas to zina, redz tavus termiņus. Nedod to citiem." }));
+          if (confirm("Nomainīt saiti? Vecā pārstās strādāt.")) postForm("/settings/ics/reset"); } }, "Nomainīt saiti")));
   }
   const sc = $("#web-sched");
   if (sc) sc.textContent = `Serveris sinhronizē pats katru dienu ${(STATUS.schedule.times || []).join(" un ")}. Dators nav jāieslēdz.`;
@@ -1467,11 +1509,12 @@ function renderMs(st) {
   if (["email", "password", "number", "approve", "otp", "choose", "done"].includes(step) && msShot) {
     msShot = false; msInput({ a: "shot", on: false });            // atpazīts solis — ekrāna skats nav vajadzīgs
   }
-  const stage = { start: 0, email: 0, password: 1, number: 2, approve: 2, otp: 2, choose: 2, done: 3 }[step];
+  const googleDone = !!(STATUS.google && STATUS.google.connected);
+  const stage = { start: 0, email: 0, password: 1, number: 2, approve: 2, otp: 2, choose: 2, done: googleDone ? 4 : 3 }[step];
   if (stage !== undefined || step === "loading" || step === "starting") {
     const cur = stage ?? msStage;
     msStage = cur;
-    kids.push(el("ol", { class: "ms-steps" }, ["E-pasts", "Parole", "Apstiprināšana"].map((t, i) =>
+    kids.push(el("ol", { class: "ms-steps" }, ["E-pasts", "Parole", "MFA", "Google"].map((t, i) =>
       el("li", { class: i < cur ? "ok" : i === cur ? "on" : "" }, el("span", { text: i < cur ? "✓" : String(i + 1) }), t))));
   }
   if (step === "start") {
@@ -1505,10 +1548,18 @@ function renderMs(st) {
       el("div", { class: "ms-opts" }, (st.options || []).map((o, i) =>
         el("button", { class: "btn ghost", type: "button", onclick: () => msInput({ a: "choose", i }) }, o))));
   } else if (step === "done") {
-    kids.push(el("p", {}, el("span", { class: "pill ok", text: "pieslēgts" }), " ", st.fullname || ""),
-      el("p", { text: st.message || "E-studijas pieslēgtas." }),
-      st.program ? el("p", { class: "note", text: `Atpazīts: ${st.program}${st.group ? `, ${st.group}. grupa` : ""}. Ja tas nav pareizi, nomaini iestatījumos.` }) : null,
-      el("div", { class: "ms-foot" }, el("button", { class: "btn", type: "button", onclick: () => $("#msdlg").close() }, "Gatavs")));
+    kids.push(el("p", {}, el("span", { class: "pill ok", text: "e-studijas pieslēgtas" }), " ", st.fullname || ""),
+      st.program ? el("p", { class: "note", text: `Atpazīts: ${st.program}${st.group ? `, ${st.group}. grupa` : ""}. Ja tas nav pareizi, nomaini iestatījumos.` }) : null);
+    if (googleDone) {
+      kids.push(el("p", { text: "Google jau pieslēgts: pēc sinhronizācijas termiņi būs tavā Google kalendārā un faili Drive mapē." }),
+        el("div", { class: "ms-foot" }, el("button", { class: "btn ms-go", type: "button", onclick: () => $("#msdlg").close() }, "Gatavs")));
+    } else {
+      kids.push(el("h3", { text: "Pēdējais solis: Google", style: "margin:14px 0 6px" }),
+        el("p", { text: "Pieslēdz savu Google kontu, un pēc katras sinhronizācijas termiņi paši parādīsies tavā Google kalendārā, bet Drive būs mape “RTU estudijas” ar kursiem." }),
+        el("p", { class: "note", text: "Lapa var mainīt tikai savu kalendāru “RTU estudijas” un pašas izveidotos Drive failus. Citus tavus kalendārus un failus tā neredz." }),
+        el("button", { class: "btn ms-go", type: "button", onclick: () => postForm("/settings/google/connect") }, "Pieslēgt Google"),
+        el("div", { class: "ms-foot" }, el("button", { class: "linkish", type: "button", onclick: () => $("#msdlg").close() }, "Izlaist (var izdarīt vēlāk iestatījumos)")));
+    }
     loadStatus(); loadConfig().catch(() => { });
   } else if (step === "error" || step === "cancelled" || step === "none") {
     kids.push(el("p", { class: step === "error" ? "ms-err" : "note", text: st.message || "Pieteikšanās nav aktīva." }),
@@ -1538,6 +1589,7 @@ function renderMs(st) {
     el("button", { class: "btn ghost small", type: "button", onclick: () => { msInput({ a: "cancel" }); $("#msdlg").close(); } }, "Atcelt")));
   $("#ms-body").replaceChildren(...kids.flat().filter(Boolean));
 }
+$("#rem-add").addEventListener("click", () => { $("#rem-list").append(remRow(60)); if (WEB) saveConfig(); });
 $("#ms-close").addEventListener("click", () => $("#msdlg").close());
 $("#msdlg").addEventListener("close", () => { clearTimeout(msTimer); if (msActive) { msActive = false; post("/api/ms/input", { a: "cancel" }).catch(() => { }); } });
 $("#zip-selected")?.addEventListener("click", async () => {

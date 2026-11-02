@@ -19,19 +19,21 @@ Pārlūks → Cloudflare (HTTPS, slēpj IP) → nginx VAI cloudflared → web :8
 ## 1. Vienreiz: Google Cloud (to dara repo īpašnieks)
 
 1. [console.cloud.google.com](https://console.cloud.google.com/) → jauns projekts `estudijas-sync`.
-2. *APIs & Services → Library* → **Google Drive API** → Enable.
+2. *APIs & Services → Library* → **Google Drive API** un **Google Calendar API** → Enable (abi).
 3. *Google Auth Platform → Branding*: app nosaukums, e-pasts, **Authorized domain: `lodelo.de`**,
    privacy policy: `https://estudijas.lodelo.de/privacy`.
 4. *Audience*: External. Kamēr *Testing* režīmā — pievieno visus lietotājus pie *Test users*.
    ⚠ Testing režīmā Drive atļauja izbeidzas pēc 7 dienām (tad jāspiež "Pieslēgt Google Drive" no jauna).
    Lai tā nebūtu, pārslēdz uz *In production* (lietotāji redzēs "unverified app" brīdinājumu, tas ir OK).
-5. *Data access* → pievieno scope `.../auth/drive.file`.
+5. *Data access* → pievieno scopes `.../auth/drive.file` un `.../auth/calendar.app.created`
+   (lapa var veidot tikai savu kalendāru “RTU estudijas” un mainīt tikai to).
 6. *Clients → Create client → Web application*:
    - Authorized redirect URIs: `https://estudijas.lodelo.de/auth/google/callback`
      (izstrādei arī `http://localhost:8000/auth/google/callback`)
    - Client ID un secret → `.env`.
 
-Google Calendar API **nav** vajadzīgs: kalendārs iet caur slepenu ICS saiti.
+Kalendārs: pēc katras sinhronizācijas termiņi tiek ielikti lietotāja Google kalendārā “RTU estudijas”.
+Slepenā ICS saite paliek Outlook/Apple kalendāriem un .ics lejupielādei.
 
 ## 2. Vienreiz: Cloudflare DNS
 

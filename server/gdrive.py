@@ -15,7 +15,7 @@ from estudijas_sync.config import State
 from estudijas_sync.drive import file_category
 
 from .crypto import decrypt
-from .google_oauth import DRIVE_SCOPE, TOKEN_URL
+from .google_oauth import CALENDAR_SCOPE, DRIVE_SCOPE, TOKEN_URL
 from .settings import settings
 
 log = logging.getLogger(__name__)
@@ -23,16 +23,44 @@ FOLDER_MIME = "application/vnd.google-apps.folder"
 ROOT_NAME = "RTU estudijas"
 
 
-def _service(user):
+def _service(user, api: str = "drive"):
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
 
     refresh = decrypt(user.google.refresh_token_enc) if user.google else None
     if not refresh:
-        raise RuntimeError("Google Drive nav pieslēgts (vai piekļuve atsaukta).")
+        raise RuntimeError("Google nav pieslēgts (vai piekļuve atsaukta).")
+    scope = DRIVE_SCOPE if api == "drive" else CALENDAR_SCOPE
     creds = Credentials(None, refresh_token=refresh, token_uri=TOKEN_URL, client_id=settings.google_client_id,
-                        client_secret=settings.google_client_secret, scopes=[DRIVE_SCOPE])
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
+                        client_secret=settings.google_client_secret, scopes=[scope])
+    return build(*(("drive", "v3") if api == "drive" else ("calendar", "v3")), credentials=creds, cache_discovery=False)
+
+
+def has_scope(user, scope: str) -> bool:
+    return bool(user.google and scope in (user.google.scopes or ""))
+
+
+def folder_url(cfg) -> str:
+    try:
+        fid = json.loads((cfg.data_dir / "drive_index.json").read_text(encoding="utf-8"))["folders"][""]
+        return f"https://drive.google.com/drive/folders/{fid}"
+    except (OSError, ValueError, KeyError, TypeError):
+        return ""
+
+
+def calendar_sync(user, cfg, view: dict) -> int:
+    """Termiņi tavā Google kalendārā "RTU estudijas" (tas pats kods, ko izmanto darbvirsmas versija)."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from estudijas_sync import gcal
+
+    svc = _service(user, "calendar")
+    state = State(cfg.data_dir / "state.json")
+    dls, courses = gcal.deadlines_from_view(view, cfg.include_text_dates)
+    n = gcal.sync(cfg, state, dls, courses, datetime.now(ZoneInfo(cfg.timezone)), svc=svc)
+    state.save()
+    return n
 
 
 def _q(s: str) -> str:
@@ -82,6 +110,11 @@ def mirror(user, cfg) -> int:
     state = State(cfg.data_dir / "state.json")
     uploaded = 0
     try:
+        # mape "RTU estudijas" un kursu apakšmapes — arī, ja vēl nekas nav ielādēts
+        folders.get("")
+        for d in sorted(cfg.output_dir.iterdir()) if cfg.output_dir.exists() else []:
+            if d.is_dir() and not d.name.startswith("."):
+                folders.get(d.name)
         for entry in state.files.values():
             rel = entry.get("path")
             # pašu atzīmētie (web lapā "Ielādēt atzīmētos") — vienmēr; pārējie pēc kategorijām

@@ -126,7 +126,10 @@ def ensure_calendar(svc, cfg: Config, state: State) -> str:
             pass
     page = None
     while True:
-        lst = svc.calendarList().list(pageToken=page).execute()
+        try:
+            lst = svc.calendarList().list(pageToken=page).execute()
+        except Exception:  # noqa: BLE001  (calendar.app.created scope sarakstu var neatļaut — tad veido jaunu)
+            break
         for it in lst.get("items", []):
             if it.get("summary") == cfg.google_calendar_name:
                 state.data["gcal_calendar_id"] = it["id"]
@@ -152,7 +155,9 @@ def _body(d: Deadline, courses: dict[int, Course], cfg: Config, now: datetime) -
         "start": {"dateTime": s.isoformat(), "timeZone": cfg.timezone},
         "end": {"dateTime": e.isoformat(), "timeZone": cfg.timezone},
         "reminders": {"useDefault": False, "overrides": [] if d.done or not future else
-                      [{"method": "popup", "minutes": m} for m in cfg.reminders_minutes]},
+                      # Google atļauj ne vairāk kā 5 atgādinājumus, līdz 4 nedēļām
+                      [{"method": "popup", "minutes": m} for m in sorted({int(x) for x in cfg.reminders_minutes
+                                                                         if 0 <= int(x) <= 40320})[:5]]},
         "status": "confirmed",
         "source": {"title": "estudijas.rtu.lv", "url": d.url} if d.url.startswith("http") else None,
     }
@@ -178,10 +183,11 @@ def _execute(req, tries: int = 4):
             raise
 
 
-def sync(cfg: Config, state: State, deadlines: list[Deadline], courses: dict[int, Course], now: datetime) -> int:
+def sync(cfg: Config, state: State, deadlines: list[Deadline], courses: dict[int, Course], now: datetime,
+         svc=None) -> int:
     from googleapiclient.errors import HttpError
 
-    svc = get_service(cfg)
+    svc = svc or get_service(cfg)
     cid = ensure_calendar(svc, cfg, state)
     synced: dict = state.data.setdefault("gcal_events", {})
     current: dict[str, dict] = {}

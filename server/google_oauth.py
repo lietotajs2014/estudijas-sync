@@ -1,8 +1,8 @@
 """Google OAuth 2.0 (web server flow).
 
 - Pieteikšanās: scope `openid email profile` — tikai identitāte, refresh token netiek glabāts.
-- Drive pieslēgšana (atsevišķi, pēc izvēles): scope `drive.file` — app redz tikai pašas izveidotos failus.
-Kalendārs iet caur ICS saiti, tāpēc Calendar scope nav vajadzīgs.
+- Google pieslēgšana (pēc RTU pieteikšanās, pēc izvēles): `drive.file` — app redz tikai pašas izveidotos failus;
+  `calendar.app.created` — app var veidot savu kalendāru "RTU estudijas" un mainīt tikai to (citus kalendārus neredz).
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 LOGIN_SCOPES = "openid email profile"
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.app.created"
 
 
 def redirect_uri() -> str:
@@ -41,8 +42,8 @@ def start(session: dict, purpose: str) -> str:
         "code_challenge": challenge,
         "code_challenge_method": "S256",
     }
-    if purpose == "drive":
-        params.update(scope=f"{LOGIN_SCOPES} {DRIVE_SCOPE}", access_type="offline", prompt="consent",
+    if purpose in ("drive", "google"):
+        params.update(scope=f"{LOGIN_SCOPES} {DRIVE_SCOPE} {CALENDAR_SCOPE}", access_type="offline", prompt="consent",
                       include_granted_scopes="true")
     else:
         params.update(scope=LOGIN_SCOPES, prompt="select_account")

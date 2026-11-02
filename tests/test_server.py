@@ -338,3 +338,56 @@ def test_panel_ms_login_api(client, monkeypatch):
         assert u.program == "RMCE0" and u.group == "3" and u.moodle.source == "lapa" and u.sync_requested
         assert "zzz" not in u.moodle.cookies_enc and "zzz" in decrypt(u.moodle.cookies_enc)
         assert (u.prefs or {}).get("rtu_email") == "anna@edu.rtu.lv"
+
+
+def test_google_connect_and_calendar_sync(client, monkeypatch):
+    from server import gdrive, google_oauth as go, runner
+
+    _page, h = _panel(client, monkeypatch, "g-goo")
+    with SessionLocal() as db:
+        from server.db import MoodleLink
+        u = db.query(User).filter_by(google_sub="g-goo").one()
+        db.add(MoodleLink(user_id=u.id, mode="web", token_enc="", cookies_enc=encrypt("[]")))
+        u.sync_requested = False
+        db.commit()
+        uid = u.id
+    # Google ar Drive + kalendāru (tas pats konts)
+    monkeypatch.setattr(go, "finish", lambda s, st, code: ("google", {"sub": "g-goo", "email": "students@example.com"},
+                        {"refresh_token": "rt", "scope": f"openid {go.DRIVE_SCOPE} {go.CALENDAR_SCOPE}"}))
+    r = client.get("/auth/google/callback?state=x&code=y", follow_redirects=False)
+    assert r.headers["location"] == "/"
+    st = client.get("/api/status", headers=h).json()
+    assert st["gcal"] == {"connected": True, "enabled": True} and st["drive"]["enabled"]
+    assert "Google Calendar" in st["flash"]["msg"] and st["ics_download"].endswith("?download=1")
+    with SessionLocal() as db:
+        u = db.get(User, uid)
+        assert u.sync_requested and decrypt(u.google.refresh_token_enc) == "rt"
+        # sinhronizācija → kalendārs un Drive tiek atjaunināti
+        calls = []
+        monkeypatch.setattr(gdrive, "calendar_sync", lambda user, cfg, view: calls.append(("cal", cfg.reminders_minutes)) or 3)
+        monkeypatch.setattr(gdrive, "mirror", lambda user, cfg: calls.append(("drive",)) or 0)
+        monkeypatch.setattr("estudijas_sync.sync.run_sync", lambda cfg, **kw: {"courses": 1, "warning_list": []})
+        res = runner.sync_user(db, u)
+        assert res["gcal_changes"] == 3 and ("drive",) in calls and calls[-1][0] == "cal"
+    # atgādinājumi: cik grib, līdz 28 d.
+    cfg = client.post("/api/config", headers=h, json={"reminders_minutes": [10, 1440, 2 * 1440 + 90, 99999, 10],
+                                                       "gcal_enabled": False}).json()["values"]
+    assert cfg["reminders_minutes"] == [2970, 1440, 10] and cfg["gcal_enabled"] is False
+    secret = client.get("/api/status", headers=h).json()["ics_url"].rsplit("/", 1)[1]
+    assert "attachment" in client.get(f"/cal/{secret}?download=1").headers.get("content-disposition", "")
+
+
+def test_gcal_body_max_5_reminders():
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    from estudijas_sync import gcal
+    from estudijas_sync.model import Deadline
+    from server.runner import build_config
+
+    u = User(id=99, google_sub="x", email="e", prefs={"reminders_minutes": [5, 10, 60, 120, 1440, 2880, 50000]})
+    cfg = build_config(u)
+    now = datetime.now(ZoneInfo("Europe/Riga"))
+    d = Deadline(uid="a", course_id=1, kind="MD", title="MD1", due=now + timedelta(days=3), url="https://x")
+    mins = [o["minutes"] for o in gcal._body(d, {}, cfg, now)["reminders"]["overrides"]]
+    assert mins == [5, 10, 60, 120, 1440] and cfg.google_calendar_name == "RTU estudijas"

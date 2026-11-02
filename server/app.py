@@ -180,25 +180,33 @@ def google_callback(request: Request, state: str = "", code: str = "", error: st
         return RedirectResponse("/", 303)
     email = ident.get("email", "").lower()
 
-    if purpose == "drive":
+    if purpose in ("drive", "google"):
         user = db.get(User, request.session.get("uid") or 0)
         if not user or user.google_sub != ident.get("sub"):
-            flash(request, "Drive jāpieslēdz ar to pašu Google kontu, ar kuru esi pieteicies.", "err")
-            return RedirectResponse("/settings", 303)
+            flash(request, "Google jāpieslēdz ar to pašu Google kontu, ar kuru esi pieteicies lapā.", "err")
+            return RedirectResponse("/", 303)
         refresh = tokens.get("refresh_token")
-        if not refresh or google_oauth.DRIVE_SCOPE not in tokens.get("scope", ""):
-            flash(request, "Google nedeva Drive atļauju. Mēģini vēlreiz un atzīmē Drive piekļuvi.", "err")
-            return RedirectResponse("/settings", 303)
+        scopes = tokens.get("scope", "")
+        has_drive, has_cal = google_oauth.DRIVE_SCOPE in scopes, google_oauth.CALENDAR_SCOPE in scopes
+        if not refresh or not (has_drive or has_cal):
+            flash(request, "Google nedeva atļauju. Mēģini vēlreiz un atzīmē Drive un kalendāru.", "err")
+            return RedirectResponse("/", 303)
         if user.google:
             user.google.refresh_token_enc = encrypt(refresh)
-            user.google.scopes = tokens.get("scope", "")
+            user.google.scopes = scopes
             user.google.linked = utcnow()
         else:
-            db.add(GoogleLink(user_id=user.id, refresh_token_enc=encrypt(refresh), scopes=tokens.get("scope", "")))
-        user.drive_enabled = True
+            db.add(GoogleLink(user_id=user.id, refresh_token_enc=encrypt(refresh), scopes=scopes))
+        user.drive_enabled = has_drive
+        p = dict(user.prefs or {})
+        p["gcal_enabled"] = has_cal
+        user.prefs = p
+        if user.moodle and user.moodle.valid:
+            user.sync_requested = True          # uzreiz aizpilda kalendāru un izveido Drive mapes
         db.commit()
-        flash(request, "Google Drive pieslēgts. Faili parādīsies Drive mapē “RTU estudijas” pēc nākamās sinhronizācijas.")
-        return RedirectResponse("/settings", 303)
+        what = " un ".join(x for x, ok in (("Google Calendar", has_cal), ("Google Drive", has_drive)) if ok)
+        flash(request, f"Pieslēgts {what}. Sinhronizēju — termiņi kalendārā parādīsies pēc pāris minūtēm.")
+        return RedirectResponse("/", 303)
 
     if not settings.email_allowed(email):
         log.info("Atteikta pieteikšanās: %s", email)
@@ -394,18 +402,21 @@ def settings_submit(request: Request, program: str = Form(""), group: str = Form
 
 
 @app.post("/settings/drive/connect")
-def drive_connect(request: Request, _=Depends(check_csrf), user: User = Depends(require_user)):
-    return RedirectResponse(google_oauth.start(request.session, "drive"), 303)
+@app.post("/settings/google/connect")
+def google_connect(request: Request, _=Depends(check_csrf), user: User = Depends(require_user)):
+    return RedirectResponse(google_oauth.start(request.session, "google"), 303)
 
 
 @app.post("/settings/drive/disconnect")
+@app.post("/settings/google/disconnect")
 def drive_disconnect(request: Request, _=Depends(check_csrf), user: User = Depends(require_user),
                      db: Session = Depends(get_db)):
     if user.google:
         db.delete(user.google)
     user.drive_enabled = False
+    user.prefs = {**(user.prefs or {}), "gcal_enabled": False}
     db.commit()
-    flash(request, "Drive atvienots. Pilnībā atsaukt piekļuvi var myaccount.google.com → Security → Third-party apps.")
+    flash(request, "Google atvienots (Drive un kalendārs). Pilnībā atsaukt piekļuvi var myaccount.google.com → Security → Third-party apps.")
     return RedirectResponse("/settings", 303)
 
 
@@ -446,18 +457,20 @@ def delete_account(request: Request, confirm: str = Form(""), _=Depends(check_cs
 # ---- kalendārs (bez pieteikšanās; aizsargā slepenais identifikators saitē)
 
 @app.get("/cal/{secret}.ics")
-def calendar_feed(secret: str, db: Session = Depends(get_db)):
+def calendar_feed(secret: str, download: int = 0, db: Session = Depends(get_db)):
     if len(secret) < 20:
         raise HTTPException(404)
     user = db.scalar(select(User).where(User.ics_secret == secret))
     if not user or not settings.email_allowed(user.email):
         raise HTTPException(404)
     p = ics_path(user.id)
+    headers = {"Cache-Control": "private, max-age=900"}
+    if download:
+        headers["Content-Disposition"] = 'attachment; filename="termini.ics"'
     if not p.exists():
         return Response("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//estudijas-sync//LV\r\nEND:VCALENDAR\r\n",
-                        media_type="text/calendar; charset=utf-8")
-    return FileResponse(p, media_type="text/calendar; charset=utf-8",
-                        headers={"Cache-Control": "private, max-age=900"})
+                        media_type="text/calendar; charset=utf-8", headers=headers)
+    return FileResponse(p, media_type="text/calendar; charset=utf-8", headers=headers)
 
 
 @app.exception_handler(HTTPException)

@@ -25,6 +25,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from .db import SessionLocal, User, get_db
+from .gdrive import folder_url, has_scope
+from .google_oauth import CALENDAR_SCOPE, DRIVE_SCOPE
 from .runner import build_config, ics_path, load_view, prefs, read_job, user_dir
 from .settings import settings
 
@@ -111,7 +113,12 @@ def status_dict(user: User) -> dict:
         "output_dir": "serverī (tikai atzīmētie faili)",
         "account": {"email": user.email, "name": user.name},
         "rtu_email": p.get("rtu_email", ""),
-        "drive": {"connected": user.google is not None, "enabled": bool(user.drive_enabled and user.google)},
+        "drive": {"connected": has_scope(user, DRIVE_SCOPE), "enabled": bool(user.drive_enabled and has_scope(user, DRIVE_SCOPE)),
+                  "folder_url": folder_url(build_config(user)) if user.google else ""},
+        "gcal": {"connected": has_scope(user, CALENDAR_SCOPE),
+                 "enabled": bool(p.get("gcal_enabled") and has_scope(user, CALENDAR_SCOPE))},
+        "google": {"connected": user.google is not None},
+        "ics_download": f"{settings.base_url}/cal/{user.ics_secret}.ics?download=1",
         "ics_url": f"{settings.base_url}/cal/{user.ics_secret}.ics",
         "schedule": {"installed": True, "times": settings.schedule_times},
         "warnings": list((user.last_result or {}).get("warning_list") or []),
@@ -196,6 +203,7 @@ def config_dict(user: User) -> dict:
         "download_max_mb": float(p["download_max_mb"]), "include_text_dates": bool(p["include_text_dates"]),
         "reminders_minutes": list(p["reminders_minutes"]),
         "drive_enabled": bool(user.drive_enabled and user.google), "output_dir": "serverī",
+        "gcal_enabled": bool(p.get("gcal_enabled") and has_scope(user, CALENDAR_SCOPE)),
     }
     cats = list(cfg.categories) + ["Lekcijas", "Uzdevumi", "Citi"]
     return {"values": vals, "categories": list(dict.fromkeys(cats))}
@@ -228,7 +236,11 @@ def api_config_save(body: dict = Body(...), user: User = Depends(api_user), db: 
                 p[k] = _coerce(kind, body[k])
         p["lookahead_days"] = max(7, min(int(p.get("lookahead_days", 150)), 400))
         p["download_max_mb"] = max(1.0, min(float(p.get("download_max_mb", 200)), 500.0))
-        p["reminders_minutes"] = [m for m in p.get("reminders_minutes", [1440, 120]) if 0 < m <= 40320][:5]
+        # atgādinājumi: cik grib (ICS visi; Google kalendārā tuvākie 5), līdz 28 dienām
+        p["reminders_minutes"] = sorted({m for m in p.get("reminders_minutes", [1440, 120]) if 0 <= m <= 40320},
+                                        reverse=True)[:20]
+        if "gcal_enabled" in body:
+            p["gcal_enabled"] = bool(body["gcal_enabled"]) and has_scope(user, CALENDAR_SCOPE)
         if "drive_enabled" in body:
             user.drive_enabled = bool(body["drive_enabled"]) and user.google is not None
     except (ValueError, TypeError) as e:

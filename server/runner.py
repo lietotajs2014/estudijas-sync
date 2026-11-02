@@ -50,6 +50,7 @@ def prefs(user: User) -> dict:
     p.setdefault("lookahead_days", 150)
     p.setdefault("include_text_dates", True)
     p.setdefault("reminders_minutes", [1440, 120])
+    p.setdefault("gcal_enabled", False)
     return p
 
 
@@ -72,6 +73,7 @@ def build_config(user: User):
         other_groups=p["other_groups"], only_categories=list(p["only_categories"]),
         download_max_mb=float(p["download_max_mb"]), lookahead_days=int(p["lookahead_days"]),
         include_text_dates=bool(p["include_text_dates"]), reminders_minutes=[int(x) for x in p["reminders_minutes"]],
+        google_calendar_name="RTU estudijas",
         notify=False, login_popup=False, google=False, drive_enabled=False, ics=True, auto_download=False,
     )
 
@@ -192,6 +194,21 @@ def _login_expired(db: Session, user: User) -> None:
     db.commit()
 
 
+def _calendar(user: User, cfg, warnings: list) -> int | None:
+    from .google_oauth import CALENDAR_SCOPE
+    from .gdrive import calendar_sync, has_scope
+
+    if not (prefs(user).get("gcal_enabled") and has_scope(user, CALENDAR_SCOPE)):
+        return None
+    try:
+        return calendar_sync(user, cfg, load_view(user.id) or {})
+    except Exception as e:
+        log.exception("Google Calendar (user %s)", user.id)
+        from estudijas_sync.gcal import friendly_error
+        warnings.append(f"Google Calendar: {friendly_error(e)}")
+        return None
+
+
 def _drive(user: User, cfg, warnings: list) -> int | None:
     if not (user.drive_enabled and user.google):
         return None
@@ -219,6 +236,9 @@ def sync_user(db: Session, user: User, prog=None) -> dict:
     up = _drive(user, cfg, warnings)
     if up is not None:
         res["drive_uploaded"] = up
+    ch = _calendar(user, cfg, warnings)
+    if ch is not None:
+        res["gcal_changes"] = ch
     res["warning_list"] = warnings
     res.pop("output", None)
     user.last_result = json.loads(json.dumps(res, default=str))
