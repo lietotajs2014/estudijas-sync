@@ -57,7 +57,10 @@ class Fake(BaseHTTPRequestHandler):
                                   '<div data-userid="77"></div><span class="usertext">Jānis Bērziņš</span>', "Dashboard")
             return self._redirect("/ms/login")
         if p == "/ms/login":
-            return self._html('<form method=post action=/ms/email><input type=email name=loginfmt id=i0116>'
+            # kā īstajā Microsoft lapā: nākamie soļi jau DOM, nobīdīti ārpus ekrāna
+            return self._html('<div style="position:absolute;left:-9999px;top:0"><input type=email name=other>'
+                              '<input type=password name=passwd></div>'
+                              '<form method=post action=/ms/email><input type=email name=loginfmt id=i0116>'
                               '<input type=submit id=idSIButton9 value=Next></form>')
         if p == "/ms/pwd":
             return self._html('<div id=displayName>janis@edu.rtu.lv</div><input type=email name=loginfmt style="display:none">'

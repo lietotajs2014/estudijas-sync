@@ -29,8 +29,15 @@ VIEWPORT = {"width": 460, "height": 820}
 # Vienā JS izsaukumā nosaka, kurā Microsoft / RTU pieteikšanās solī esam (redzamie elementi).
 DETECT_JS = r"""
 () => {
+  // redzams = ar izmēru, ekrāna robežās (Microsoft slēptos soļus nobīda ārpus ekrāna), nav caurspīdīgs/aria-hidden
   const ok = e => { const r = e.getBoundingClientRect(), s = getComputedStyle(e);
-    return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.display !== "none"; };
+    if (!(r.width > 0 && r.height > 0) || s.visibility === "hidden" || s.display === "none") return false;
+    if (r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight + 400) return false;
+    for (let x = e; x && x !== document.body; x = x.parentElement) {
+      const xs = getComputedStyle(x);
+      if (x.getAttribute("aria-hidden") === "true" || Number(xs.opacity) === 0) return false;
+    }
+    return true; };
   const vis = sel => [...document.querySelectorAll(sel)].find(ok) || null;
   const txt = sel => { const e = vis(sel); return e ? (e.innerText || e.value || "").trim() : ""; };
   const error = txt("#usernameError, #passwordError, #errorText, #idSpan_SAOTCC_Error_OTC, #error, .alert-error, " +
@@ -231,8 +238,25 @@ class LoginSession:
     # ---- darbības
     @staticmethod
     def _visible(page, sel: str):
-        loc = page.locator(f"{sel} >> visible=true").first
-        return loc if loc.count() else None
+        """Pirmais tiešām redzamais elements: selektori pēc kārtas (svarīgākais pirmais), tikai ekrāna robežās."""
+        vw = page.viewport_size or VIEWPORT
+        for one in [x.strip() for x in sel.split(", ") if x.strip()]:
+            items = page.locator(one)
+            for i in range(min(items.count(), 10)):
+                loc = items.nth(i)
+                try:
+                    if not loc.is_visible() or not loc.is_enabled():
+                        continue
+                    box = loc.bounding_box()
+                    if not box or box["x"] + box["width"] <= 0 or box["x"] >= vw["width"] or box["y"] + box["height"] <= 0:
+                        continue
+                    if loc.evaluate("e => { for (let x = e; x && x !== document.body; x = x.parentElement) {"
+                                    " if (x.getAttribute('aria-hidden') === 'true' || Number(getComputedStyle(x).opacity) === 0) return false; }"
+                                    " return true; }"):
+                        return loc
+                except Exception:  # noqa: BLE001
+                    continue
+        return None
 
     def _click(self, page, sel: str) -> bool:
         loc = self._visible(page, sel)
@@ -245,7 +269,11 @@ class LoginSession:
         loc = self._visible(page, sel)
         if not loc:
             return False
+        loc.click(timeout=5000)
         loc.fill(value, timeout=5000)
+        if loc.input_value() != value:          # daži lauki fill neuztver — rakstām kā ar klaviatūru
+            loc.fill("")
+            loc.type(value, delay=15)
         loc.press("Enter")
         return True
 
