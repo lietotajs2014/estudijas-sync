@@ -186,7 +186,11 @@ class App:
             raise
         except AlreadyRunning as e:
             return str(e)
-        return r["changes_text"]
+        msg = r["changes_text"]
+        gw = [w for w in r.get("warning_list", []) if w.startswith("Google") or w.startswith("Drive")]
+        if gw:
+            msg = "\n".join(gw) + "\n" + msg
+        return msg
 
     def job_login(self) -> str:
         from .auth import interactive_login
@@ -200,14 +204,31 @@ class App:
         st = State(cfg.data_dir / "state.json")
         try:
             svc = gcal.get_service(cfg, interactive=True)
-            cid = gcal.ensure_calendar(svc, cfg, st)
+            gcal.ensure_calendar(svc, cfg, st)
         except gcal.GCalNotAuthorized:
             raise
         except Exception as e:
             raise RuntimeError(gcal.friendly_error(e)) from e
+        email = gcal.account_email(svc)
+        st.data["gcal_account"] = email
         st.save()
         set_toml_values(cfg.config_path, {("calendar", "google"): True})
-        return f"Google Calendar savienots (kalendārs '{cfg.google_calendar_name}', {cid})."
+        msg = f"Google Calendar savienots{f' kontam {email}' if email else ''}. Kalendārs: '{cfg.google_calendar_name}'."
+        # uzreiz ieliek termiņus no pēdējās sinhronizācijas
+        view = self.view()
+        if view.get("deadlines") is not None:
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo
+            dls, courses = gcal.deadlines_from_view(view, cfg.include_text_dates)
+            try:
+                n = gcal.sync(self.cfg(), st, dls, courses, _dt.now(ZoneInfo(cfg.timezone)))
+                st.save()
+                msg += f" Ievietoti/atjaunināti {n} termiņi."
+            except Exception as e:
+                msg += f" Termiņus ievietot neizdevās: {gcal.friendly_error(e)}"
+        else:
+            msg += " Termiņi parādīsies pēc sinhronizācijas."
+        return msg
 
     def job_download(self, keys: list[str]) -> str:
         from .sync import download_selected
@@ -258,6 +279,7 @@ class App:
             "schedule": {"installed": schedule.status(cfg), "times": cfg.schedule_times},
             "google_credentials": cfg.google_credentials.exists(),
             "google_token": (cfg.data_dir / "google_token.json").exists(),
+            "gcal_account": st.get("gcal_account", ""),
             "platform": platform.system(),
         }
 

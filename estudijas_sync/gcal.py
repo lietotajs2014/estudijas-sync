@@ -79,6 +79,31 @@ def get_service(cfg: Config, interactive: bool = False):
     return build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 
+def account_email(svc) -> str:
+    try:
+        return svc.calendarList().get(calendarId="primary").execute().get("id", "")
+    except Exception:
+        return ""
+
+
+def deadlines_from_view(view: dict, include_text: bool) -> tuple[list[Deadline], dict[int, Course]]:
+    """Termiņi no pēdējās sinhronizācijas (view.json) — lai kalendāru aizpildītu uzreiz pēc savienošanas."""
+    courses = {int(c["id"]): Course(int(c["id"]), c.get("label", ""), c.get("full", ""), c.get("url", ""))
+               for c in view.get("courses", [])}
+    rows = list(view.get("deadlines", [])) + (list(view.get("text_dates", [])) if include_text else [])
+    out = []
+    for r in rows:
+        try:
+            out.append(Deadline(uid=r["uid"], course_id=int(r.get("course_id") or 0), kind=r["kind"], title=r["title"],
+                                due=datetime.fromisoformat(r["due"]),
+                                start=datetime.fromisoformat(r["start"]) if r.get("start") else None,
+                                url=r.get("url", ""), status=r.get("status"), source=r.get("source", "moodle"),
+                                details=r.get("details", ""), relevance=r.get("relevance"), section=r.get("section", "")))
+        except (KeyError, ValueError):
+            continue
+    return out, courses
+
+
 def ensure_calendar(svc, cfg: Config, state: State) -> str:
     cid = state.data.get("gcal_calendar_id")
     if cid:

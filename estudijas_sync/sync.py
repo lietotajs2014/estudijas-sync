@@ -321,7 +321,8 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     return {"courses": len(courses), "deadlines": len(moodle), "text_deadlines": len(text_dl),
             "new": len(report["new"]), "updated": len(report["updated"]), "errors": len(report["errors"]),
             "warnings": len(warnings), "gcal_changes": gcal_changes, "output": str(out),
-            "changes_text": chg.render_console(ch, by_id), "drive_copied": len(drive_copied)}
+            "changes_text": chg.render_console(ch, by_id), "drive_copied": len(drive_copied),
+            "warning_list": warnings}
 
 
 def sync_with_relogin(cfg: Config, redownload: bool = False, no_calendar: bool = False, prog=None,

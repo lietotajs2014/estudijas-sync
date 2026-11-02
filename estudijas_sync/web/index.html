@@ -1035,7 +1035,8 @@ function renderGcalRow() {
     row.append(file, el("button", { class: "btn ghost small", type: "button", onclick: () => file.click() }, "Augšupielādēt failu"),
       );
   } else {
-    row.append(STATUS.google_token ? el("span", { class: "pill ok", text: "savienots" }) : el("span", { class: "pill warn", text: "nav savienots" }),
+    row.append(STATUS.google_token ? el("span", { class: "pill ok", text: STATUS.gcal_account ? `savienots: ${STATUS.gcal_account}` : "savienots" })
+      : el("span", { class: "pill warn", text: "nav savienots" }),
       el("button", { class: "btn ghost small", type: "button", onclick: () => runJob("gcal") },
         STATUS.google_token ? "Savienot no jauna" : "Savienot ar Google"),
       STATUS.google_token ? el("a", { class: "btn ghost small", href: "https://calendar.google.com/calendar/r",
