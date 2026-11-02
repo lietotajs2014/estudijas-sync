@@ -56,7 +56,7 @@ def get_service(cfg: Config, interactive: bool = False):
         from google_auth_oauthlib.flow import InstalledAppFlow
         from googleapiclient.discovery import build
     except ImportError as e:
-        raise GCalNotAuthorized("Nav instalētas Google bibliotēkas: pip install -r requirements-google.txt") from e
+        raise GCalNotAuthorized("Nav instalētas Google bibliotēkas: pip install -r requirements.txt") from e
     tok = cfg.data_dir / "google_token.json"
     creds = Credentials.from_authorized_user_file(str(tok), SCOPES) if tok.exists() else None
     if creds and not creds.valid and creds.expired and creds.refresh_token:

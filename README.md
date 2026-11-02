@@ -1,223 +1,175 @@
 # estudijas-sync
 
-Automātiski pārbauda **estudijas.rtu.lv** (Moodle) 2× dienā. Lekciju prezentācijas, MD/KD/LD materiāli un uzdevumu pielikumi nonāk sakārtoti datora mapēs. Visi termiņi (MD, KD, testi, eksāmeni) nonāk kalendārā, bet `UZDEVUMI.md` parāda, kas jādara.
+## Kas tas ir
 
-Parole nekur netiek glabāta. Tu vienreiz piesakies ar RTU e-pastu (Microsoft, arī MFA) parastā pārlūka logā. Pēc tam skripts strādā ar Moodle mobilās lietotnes piekļuves žetonu, ko izmanto arī oficiālā Moodle lietotne.
+**estudijas-sync** ir programma RTU studentiem, kas pati seko līdzi **estudijas.rtu.lv**, lai tev nebūtu jāpārbauda katrs kurss atsevišķi. Tā darbojas tavā datorā un 2× dienā (07:30 un 19:30):
 
-## Web panelis
+- **lejupielādē materiālus**: lekciju prezentācijas, mājasdarbu, kontroldarbu un laboratorijas darbu dokumentus. Tie tiek sakārtoti vienā mapē pa kursiem un tipiem;
+- **savāc visus termiņus** (MD, KD, testi, eksāmeni) ar statusu "iesniegts" vai "nav iesniegts" un ieliek tos **Google kalendārā**. Iesniegtie kļūst zaļi, nokavētie sarkani;
+- **parāda, kas jauns**: jauni uzdevumi, pārcelti termiņi, vērtējumi, paziņojumi un faili;
+- **atrod konsultāciju laikus** un pasniedzēju e-pastus;
+- **atlasa tikai tavu programmu un grupu**, ja vienā kursā ir vairāku grupu uzdevumi.
 
-Visu var darīt pārlūkā: Windows dubultklikšķis uz **`start.bat`** (macOS: `start.command`) vai `python run.py web`. Atveras `http://127.0.0.1:8765`.
+Visu var redzēt un vadīt **web panelī** pārlūkā. Panelis darbojas tikai tavā datorā.
 
-Panelī ir:
-- **Termiņi** — divu nedēļu laika ass un saraksts ar nākotnes termiņiem: šodien/rīt, šonedēļ, šomēnes, vēlāk.
-  - Pagājušie termiņi parādās pēc pogas **"Rādīt pagājušos"**, grupēti pa mēnešiem, par visu semestri (`lookback_days`, noklusējums 200 dienas). Ja starp tiem ir neiesniegts uzdevums, poga ir sarkana.
-  - **Krāsas:** zaļš = iesniegts/izpildīts/novērtēts, sarkans = nokavēts (nav iesniegts), pelēks = pagājis (bez statusa), citādi pēc veida.
-  - Uzklikšķinot uz termiņa (laika asī vai sarakstā), atveras logs ar pilno aprakstu, termiņu, statusu, sadaļu, saistītajiem failiem un pogām **"Atvērt estudijās"** un **"Atvērt kursu"**.
-  - Filtri: KD, MD, testi, LD/PD, meklēšana. Citām grupām paslēptais ir saliktā sadaļā.
-- **Sinhronizēt tagad** ar progresa joslu un pēdējās sinhronizācijas laiku.
-- **Konsultācijas** — katram kursam:
-  - pasniedzēji (kursa kontaktpersonas no estudijām) ar e-pastu un profila saiti;
-  - konsultāciju laiki un vietas, ko skripts atrod kursu aprakstos, paziņojumos un kalendārā, ar saiti uz avotu;
-  - gaidāmās konsultācijas no kursa kalendāra.
+Paroli programma nekur neglabā. Tu piesakies ar RTU kontu parastā Microsoft logā (arī ar MFA kodu), un pēc tam programma izmanto to pašu piekļuvi, ko oficiālā Moodle lietotne.
 
-  Pie **nokavētiem** darbiem ir sarkana saite "Konsultācijas šim kursam", un termiņa logā redzams pasniedzēja e-pasts. Katra kursa mapē ir arī `_info/Konsultācijas un pasniedzēji.md`.
-- **Jaunumi** — kas mainījies pēdējā reizē un visa vēsture.
-- **Faili** — visi kursu faili estudijās, ne tikai lejupielādētie.
-  - Augšā redzams pilns ceļš uz mapi, kurā faili tiek saglabāti, un pogas "Atvērt mapi", "Mainīt mapi" un "Atvērt Google Drive".
-  - Filtri: kurss, tips (lekcijas, MD, KD …), termiņš (faili, kas pieder konkrētam uzdevumam), statuss (ir mapē / nav mapē / nav lejupielādēti / citām grupām), meklēšana.
-  - Kārtošana: jaunākie, pa kursiem, pēc nosaukuma, pēc izmēra.
-  - **Vairāku failu izvēle**: atzīmē rūtiņas vai "Atzīmēt redzamos" un spied **"Lejupielādēt atzīmētos"**. Tā var lejupielādēt arī failus, kas pēc iestatījumiem tiktu izlaisti.
-  - Katram failam ir pogas "Atvērt" un "Parādīt mapē", kas atver Explorer ar iezīmētu failu.
-  - Katram failam redzams, kad tas ielikts estudijās, un kārtas numurs kursā (#1 ir pirmais ieliktais). Ja failam ir termiņš, redzama saite uz to, kā arī saite uz estudiju lapu, no kuras fails nāk.
-  - Uzdevumu dokumenti tiek likti uzdevuma mapē ar termiņu nosaukumā, piemēram, `Mājas darbi/MD1 — Kirhofa likumi (līdz 05.11.)/`. Turpat ir saīsne "Atvērt uzdevumu estudijās". Ja pasniedzējs termiņu pārceļ, mape tiek pārdēvēta automātiski.
-- **Iestatījumi**:
-  - e-pasts, programma, grupa;
-  - izvades mape ar izvēles logu un lejupielādējamās kategorijas;
-  - Google Drive kopēšana un saite uz Drive mapi;
-  - Google Calendar: `credentials.json` atrašanās vietu izvēlies ar **"Izvēlēties failu…"** (vai augšupielādē failu), tad spied "Savienot ar Google";
-  - `.ics`, automātiskās palaišanas laiki un paziņojumi.
-- Iestatījumu augšā ir **RTU konts**: pieteikties, pieteikties no jauna vai aizmirst piekļuvi.
-- **Help** — šī instrukcija un žurnāls.
+---
 
-Panelis darbojas tikai tavā datorā (`127.0.0.1`), un citi tīkla dalībnieki tam nevar piekļūt. **Paroles lauka nav, un tas ir apzināti**: Microsoft pieteikšanās ar MFA notiek atvērtā logā, un e-pasts tiek aizpildīts automātiski. Automātiskās sinhronizācijas strādā arī tad, ja panelis ir aizvērts.
+## Uzstādīšana soli pa solim (Windows)
 
-**Google Drive:**
-1. Datorā jābūt Google Drive for desktop.
-2. Iestatījumos ieslēdz "Kopēt uz Drive" un izvēlies mapi, piemēram, `G:/My Drive/RTU estudijas`. Poga "Atrast Drive mapi" to atrod pati.
-3. Iekopē tās pašas mapes saiti: drive.google.com → mapei *Share* → *Copy link*. Panelī parādīsies poga "Atvērt Google Drive", un saite būs arī `UZDEVUMI.md` augšā.
+**1. Uzinstalē Python un Git** (vienreiz)
+- Python: [python.org/downloads](https://www.python.org/downloads/). Instalācijas pirmajā logā **atzīmē "Add python.exe to PATH"**.
+- Git: [git-scm.com/downloads](https://git-scm.com/downloads). Visur spied *Next*.
 
-Mapi koplietot ar "Anyone with the link" vari pats, bet atceries, ka lekciju materiāli ir pasniedzēju darbs.
-
-**Kur ir faili?** Panelis cilnē *Faili* augšā rāda precīzu ceļu. Uz Windows mape "Dokumenti" bieži ir pārvirzīta uz OneDrive (`C:\Users\<tu>\OneDrive\Documents`). Jaunās instalācijās skripts lieto īsto "Dokumenti" mapi. Ja faili jau ir vecajā vietā, tie tur paliek; tos var pārvietot ar "Mainīt mapi".
-
-## Kas notiek katrā palaišanā
-
+**2. Lejupielādē programmu**
+Atver mapi, kurā gribi programmu (piemēram, *Dokumenti*). Uzklikšķini uz adreses joslas augšā, ieraksti `cmd` un spied Enter. Melnajā logā ieraksti:
 ```
-RTU estudijas/
-├── UZDEVUMI.md                ← augšā "🆕 Kopš iepriekšējās reizes", tad kas jādara (nokavēts / 7 d. / 30 d. / vēlāk)
-├── JAUNUMI.md                 ← visu palaišanu jaunumi, jaunākie augšā
-├── termini.ics                ← visi termiņi kalendāram
-└── Elektrotehnikas pamati/
-    ├── Lekcijas/              ← 01_Lekcija1.pptx, 02_... (numurs = kursa sadaļa)
-    ├── Mājas darbi/
-    │   └── MD1 — Kirhofa likumi (līdz 05.11.)/   ← uzdevuma dokumenti + "Atvērt uzdevumu estudijās.url"
-    ├── Kontroldarbi/
-    ├── Laboratorijas darbi/
-    ├── Praktiskie darbi/
-    ├── Testi un eksāmeni/
-    ├── Uzdevumi/              ← citu uzdevumu pielikumi
-    ├── Citi/
-    └── _info/
-        ├── Uzdevumi un testi.md   ← katra uzdevuma apraksts, termiņš, statuss (iesniegts/nav)
-        ├── Paziņojumi.md          ← kursa paziņojumi
-        ├── Kursa saturs.md        ← sadaļu apraksti, piezīmes
-        ├── Lapas/*.md
-        └── Saites.md
-```
-
-- **Termiņi** tiek ņemti no Moodle uzdevumiem (ar iesniegšanas statusu), testiem (atvēršanas un aizvēršanas laiks, laika limits, mēģinājumi) un kursa kalendāra (piem., eksāmeni).
-- **Datumi tekstā**: skripts pārmeklē paziņojumus, lapas un aprakstus, piemēram, "KD2 notiks 20. novembrī" vai "MD3 līdz 12.11. plkst. 23:59". Ja šādi datumi nav Moodle kalendārā, tie parādās ar ❓. Ja tekstā minēta grupa ("1. grupai"), skripts to salīdzina ar tavu grupu. Citu grupu datumi kalendārā netiek likti.
-- **Pēc katras palaišanas tiek parādīts, kas jauns**: jauni termiņi, pārcelti termiņi, jauni vērtējumi, jauni paziņojumi, jauni datumi tekstā, jauni un atjaunināti faili. Jaunumi parādās četrās vietās:
-  - konsolē, ja palaid pats;
-  - `UZDEVUMI.md` augšā;
-  - `JAUNUMI.md` vēsturē;
-  - kā **paziņojums** (Windows/macOS/Linux; Termux ar Termux:API). Paziņojums parādās tikai tad, ja kaut kas mainījies; izslēgt var ar `notify = false`.
-- **Tikai tava programma un grupa.** Vienā kursā bieži ir vairāku programmu un grupu uzdevumi. `init` pajautā tavu programmu un grupu (piem. `RMCE0`, `3`); var arī `python run.py init --program RMCE0 --group 3`. Skripts pārbauda faila, uzdevuma un sadaļas nosaukumus, kā arī tekstus. Atpazīst šādus pierakstus:
-  - programmu kodus: `RMCE0`, `RMCE0-3`, `RMCE03`, `RMMB0`;
-  - grupas: "3. grupa", "3.gr.", "grupa 3", "1. un 2. grupai", "1.–3. grupa".
-
-  Ja kaut kas ir domāts **tikai citām** programmām vai grupām, tas netiek ne lejupielādēts, ne likts kalendārā. Tas tiek tikai uzskaitīts `UZDEVUMI.md` beigās saliktā sadaļā "Citām grupām/programmām", lai varētu pārbaudīt. Viss, kur programma vai grupa nav minēta, paliek. Ja dod priekšroku citai uzvedībai, konfigurācijā iestati `other_groups = "folder"` (liek mapē `_Citām grupām`) vai `"keep"` (neatlasa).
-- Faili tiek lejupielādēti **tikai tad, ja ir jauni vai mainīti**. Ja kādu failu izdzēsīsi, tas atpakaļ nenāks.
-
-## Uzstādīšana (Windows / macOS / Linux)
-
-Vajag:
-- Python 3.11 vai jaunāku ([python.org](https://www.python.org/downloads/); Windows instalācijā atzīmē "Add Python to PATH");
-- [Git](https://git-scm.com/downloads).
-
-Komandas palaid terminālī. Windows: atver mapi, kurā gribi likt projektu, adreses joslā ieraksti `cmd` un spied Enter.
-
-```bash
 git clone https://github.com/lietotajs2014/estudijas-sync.git
-cd estudijas-sync
-pip install -r requirements.txt
-python -m playwright install chromium
+```
+Ja Git prasa pieteikties, piesakies ar GitHub kontu, kuram ir piekļuve repozitorijam.
 
-python run.py init      # pajautā programmu (piem. RMCE0) un grupu (piem. 3); izveido konfigurāciju
-python run.py login     # atveras pārlūks → piesakies ar RTU e-pastu
-python run.py sync      # pirmā sinhronizācija (var aizņemt dažas minūtes)
-python run.py install-schedule   # turpmāk 07:30 un 19:30 automātiski
+**3. Palaid**
+Atver jauno mapi `estudijas-sync` un dubultklikšķi uz **`start.bat`**. Pirmajā reizē tas pats uzinstalēs vajadzīgo (1–3 minūtes). Pēc tam pārlūkā atvērsies panelis.
+
+**4. Iestati sevi**
+Panelī → **Iestatījumi** → *Par tevi*: ieraksti RTU e-pastu, studiju programmu (piemēram, `RMCE0`) un grupu (piemēram, `3`), tad spied **Saglabāt iestatījumus**.
+
+**5. Piesakies**
+Iestatījumu augšā spied **Pieteikties**. Atvērsies Microsoft logs: ievadi paroli un, ja prasa, Authenticator kodu. Logs aizvērsies pats.
+
+**6. Sinhronizē**
+Spied **Sinhronizēt tagad**. Pirmā reize var aizņemt dažas minūtes. Pēc tam cilnē *Termiņi* būs termiņi, bet cilnē *Faili* materiāli un mape, kur tie atrodas.
+
+**7. Ieslēdz automātisko sinhronizāciju**
+*Iestatījumi* → *Automātiskā sinhronizācija* → **Ieslēgt**. Turpmāk programma darbosies 07:30 un 19:30 arī tad, ja panelis ir aizvērts.
+
+**8. (Neobligāti) Google Calendar** — skat. [Google Calendar](#google-calendar) zemāk.
+
+**Atjaunināšana:** paneļa apakšā **"Atjaunināt no GitHub"**, pēc tam aizver un no jauna palaid `start.bat`.
+
+macOS: tas pats, tikai 3. solī palaid `start.command`.
+
+---
+
+## Panelis
+
+`start.bat` vai `python run.py web` → `http://127.0.0.1:8765`
+
+- **Augšā**: divu nedēļu laika ass ar termiņiem, pēdējās sinhronizācijas laiks un poga **Sinhronizēt tagad** ar progresa joslu.
+- **Termiņi**: gaidāmie termiņi (šodien/rīt, šonedēļ, šomēnes, vēlāk).
+  - Pagājušie, grupēti pa mēnešiem, parādās pēc pogas **Rādīt pagājušos**. Poga ir sarkana, ja tur ir kaut kas neiesniegts.
+  - Uzklikšķinot uz termiņa, atveras logs ar pilnu aprakstu, statusu, failiem un pogām *Atvērt estudijās* un *Atvērt kursu*.
+  - Krāsas: **zaļš** = iesniegts/izpildīts, **sarkans** = nokavēts, **pelēks** = pagājis bez statusa.
+  - Pie nokavētiem darbiem ir saite uz kursa konsultācijām.
+- **Konsultācijas**: katram kursam pasniedzēji (e-pasts, profils), konsultāciju laiki un vietas no kursa aprakstiem un kalendāra (ar saiti uz avotu).
+- **Jaunumi**: kas mainījies pēdējā sinhronizācijā, kā arī visa vēsture.
+- **Faili**: visi kursu faili estudijās, sagrupēti pa kursiem. Katrā kursā augšā ir tuvāko termiņu faili.
+  - Filtri: kurss, termiņš, tips, statuss. Statuss pēc noklusējuma ir *Neizpildītie*: iesniegto uzdevumu faili ir paslēpti.
+  - Katram failam redzams, kad tas ielikts estudijās (#1 ir pirmais), kuram termiņam tas pieder un no kuras estudiju lapas nāk.
+  - Vairāku failu lejupielāde: atzīmē rūtiņas → **Lejupielādēt atzīmētos**.
+  - Pogas *Atvērt*, *Parādīt mapē*, *Atvērt mapi*, *Mainīt mapi*.
+- **Iestatījumi**: RTU konts, tu pats (e-pasts, programma, grupa), mape, Google Drive, Google Calendar, automātiskā sinhronizācija.
+- **Help**: šī instrukcija un žurnāls.
+
+Ja sinhronizējot estudiju sesija ir beigusies, atveras **Microsoft logs**, kur var ievadīt paroli un redzēt MFA kodu. Pēc tam sinhronizācija turpinās pati.
+
+---
+
+## Kur ir faili
+
+**Viss ir vienā mapē**, ko izvēlies iestatījumos (pēc noklusējuma `Dokumenti\RTU estudijas`):
+
+```
+RTU estudijas\
+├── UZDEVUMI.md            ← kas jādara + kas jauns
+├── JAUNUMI.md             ← visu sinhronizāciju jaunumi
+├── termini.ics            ← termiņi citiem kalendāriem
+├── Elektrotehnikas pamati\
+│   ├── Lekcijas\              01_Lekcija1.pptx, 02_…
+│   ├── Mājas darbi\
+│   │   └── MD1 — Kirhofa likumi (līdz 05.11.)\   ← uzdevuma dokumenti + "Atvērt uzdevumu estudijās"
+│   ├── Kontroldarbi\  Laboratorijas darbi\  Praktiskie darbi\  Testi un eksāmeni\  Citi\
+│   └── _info\                 uzdevumu apraksti, paziņojumi, konsultācijas, saites
+└── .estudijas-sync\       ← slēpta: iestatījumi, pieteikšanās, žurnāls (NEDOD citiem)
 ```
 
-To pašu var izdarīt web panelī: `python run.py web` vai `start.bat`.
+- Mapi maina *Iestatījumi → Mape → Izvēlēties…*. Jau lejupielādētos failus var pārvietot līdzi.
+- Ja pasniedzējs pārceļ termiņu, uzdevuma mape tiek pārdēvēta pati.
+- Faili tiek lejupielādēti tikai tad, ja ir jauni vai mainīti. Ja kādu failu izdzēsīsi, tas atpakaļ nenāks, bet to var lejupielādēt cilnē *Faili*.
+- Neizvēlies mapi OneDrive iekšienē, jo OneDrive sinhronizētu arī slēpto pārlūka profilu.
 
-**Viss ir vienā mapē**, kas norādīta iestatījumos (pēc noklusējuma `Dokumenti\RTU estudijas`). Tur ir lejupielādētie materiāli, `UZDEVUMI.md` un slēpta apakšmape `.estudijas-sync` ar skripta datiem: `config.toml`, pieteikšanās, žurnāls un pārlūka profils. Mainot mapi, arī šie dati pārvietojas līdzi. `C:\Users\<tu>\.estudijas_sync` paliek tikai mazs fails ar norādi, kur šī mape atrodas.
+---
 
-Konfigurācija ir `<mape>/.estudijas-sync/config.toml`, un panelī to atver poga "Atvērt config.toml". Tajā var iestatīt:
+## Google Calendar
 
-- `output_dir` — kur likt failus. Mapi ērtāk mainīt panelī (*Iestatījumi → Mape → Izvēlēties…*) vai ar `python run.py set-folder`, jo tad jau lejupielādētos failus var pārvietot uz jauno vietu;
-- `exclude_courses` — kursus, kurus nevajag;
-- `program` / `group` — tavu programmu un grupu (iestata `init`);
-- `[categories]` — mapju noteikumus;
-- `[schedule] times` — palaišanas laikus.
-
-Palaižot `sync` pats, terminālī redzama **progresa josla**: kursu nolasīšana, tad lejupielāde ar MB. Beigās skripts parāda, kas jauns. Automātiskās palaišanas strādā klusi; joslu var izslēgt arī ar `sync -q`.
-
-**Mapes maiņa:**
-- `python run.py set-folder` — atver mapes izvēles logu;
-- `python run.py set-folder "D:\RTU estudijas"` — pārvieto jau lejupielādētos failus uz norādīto mapi;
-- `... --redownload` — nepārvieto, bet nākamajā sinhronizācijā lejupielādē visu no jauna.
-
-Citas komandas:
-- `python run.py update` — atjaunina skriptu uz jaunāko versiju no GitHub (`git pull`; vajadzības gadījumā atjaunina arī bibliotēkas);
-- `python run.py status` — tuvākie termiņi;
-- `sync --redownload` — lejupielādē visu no jauna;
-- `uninstall-schedule` — noņem automātisko palaišanu.
-
-### Microsoft kods (MFA) sinhronizējot
-
-Ja sinhronizējot estudiju sesija ir beigusies, skripts **atver redzamu pārlūka logu**. Tur ievadi paroli, un, ja Microsoft rāda skaitli, ievadi to Authenticator lietotnē telefonā. Pēc tam logs aizveras, un sinhronizācija turpinās neredzami. E-pasts tiek aizpildīts automātiski, un uz "Stay signed in?" atbilde "Yes" tiek dota automātiski.
-
-Sesijas sīkdatnes tiek saglabātas starp palaišanām (`cookies.json` profila mapē), tāpēc kods nav jāievada katru reizi. Tas pats notiek automātiskajās palaišanās. Ja to negribi, iestati `login_popup = false` vai lieto `sync --no-login-window`: tad būs tikai brīdinājums.
-
-### Ja login saka "API žetonu iegūt neizdevās"
-
-Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skripts pārslēdzas uz **pārlūka režīmu**: sinhronizācija notiek neredzamā Chromium ar saglabāto sesiju un nolasa lapas. Tas darbojas, bet:
-
-- ik pa laikam būs jāpiesakās no jauna. Tad `UZDEVUMI.md` augšā (un Google kalendārā, ja ieslēgts) parādīsies ⚠ brīdinājums;
-- telefonā (Termux) šis režīms nedarbojas.
-
-## Kalendārs
-
-**Variants A: Google Calendar.** Notikumi tiek atjaunināti automātiski un redzami telefonā. Iesniegtie uzdevumi kļūst ✅, krāsas: KD sarkans, MD zils, testi oranži.
-
-1. [console.cloud.google.com](https://console.cloud.google.com/) izveido projektu → *APIs & Services* → ieslēdz **Google Calendar API**.
-2. *OAuth consent screen* izvēlies **External**. Pie *Test users* pievieno savu Gmail (un draugu Gmail, ja dalies ar to pašu projektu).
-3. *Credentials* → *Create credentials* → **OAuth client ID** → *Desktop app* → lejupielādē JSON. Panelī ar "Izvēlēties failu…" norādi, kur tas ir, vai augšupielādē to: tad tas tiek saglabāts `<mape>/.estudijas-sync/credentials.json`.
-4. Uzstādi:
-   ```bash
-   pip install -r requirements-google.txt
-   python run.py gcal-auth --credentials "C:/ceļš/uz/client_secret.json"
-   ```
-   Panelī to pašu dara poga "Izvēlēties failu…".
-   Konfigurācijā ieliec `[calendar] google = true`.
-
-Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Tajā ir **visi zināmie termiņi**: visi estudiju uzdevumi un testi ar datumu (gan pagājušie, gan nākotnes), kursu kalendāra notikumi, konsultācijas un tekstā atrastie datumi (❓). Ieraksta krāsa mainās pēc statusa:
-- **zaļš** — iesniegts, izpildīts vai novērtēts (pie nosaukuma ✅);
-- **sarkans** — termiņš pagājis, nav iesniegts (⚠);
+Programma izveido atsevišķu kalendāru **"RTU estudijas"** ar **visiem** zināmajiem termiņiem, arī pagājušajiem. Krāsa mainās pēc statusa:
+- **zaļš** — iesniegts, izpildīts vai novērtēts;
+- **sarkans** — nokavēts;
 - **pelēks** — pagājis notikums bez statusa;
-- gaidāmie: KD/eksāmeni violeti, MD zili, testi dzelteni, LD/PD tirkīza.
+- gaidāmie: KD/eksāmeni violeti, MD zili, testi dzelteni, LD/PD tirkīza, konsultācijas zaļganas.
 
-Krāsa nomainās nākamajā sinhronizācijā pēc tam, kad statuss estudijās ir mainījies. Atgādinājumi tiek iestatīti 1 dienu un 2 h pirms termiņa (`reminders_minutes`).
+Atgādinājumi pienāk 1 dienu un 2 stundas pirms termiņa.
 
-**Variants B: `termini.ics`.** Šo failu var importēt jebkurā kalendārā (Outlook, Apple), bet imports ir vienreizējs. Automātiskai atjaunināšanai izmanto variantu A.
+**Iestatīšana (vienreiz, ~10 min):**
+1. [console.cloud.google.com](https://console.cloud.google.com/) → izveido projektu.
+2. *APIs & Services → Library* → **Google Calendar API** → **Enable**.
+3. *Google Auth Platform* (vai *OAuth consent screen*) → *Get started* → app nosaukums `estudijas-sync`, savs e-pasts, **External**.
+4. *Audience → Test users* → **Add users** → savs Gmail (un draugu Gmail, ja viņi izmantos tavu app).
+5. *Clients* (vai *Credentials*) → **Create client** → tips **Desktop app** → **Download JSON**.
+6. Panelī: *Iestatījumi → Kalendārs* → **Izvēlēties failu…** (lejupielādētais JSON) → **Savienot ar Google**. Izvēlies to Gmail, ko pievienoji kā Test user, un spied *Continue*.
 
-## Telefons (Android, tikai MD dokumenti)
+Testing režīmā Google savienojumu atsauc pēc 7 dienām. Tad paneļa augšā parādās sarkans "Savienot no jauna", un jāapstiprina vēlreiz.
 
-Telefonā skripts lejupielādē tikai mājas darbu dokumentus un `UZDEVUMI.md`. Visi faili nonāk datorā. Tas strādā tikai API režīmā.
+Telefonā kalendārs parādās Google Calendar lietotnē. Ja nav redzams: ☰ → atzīmē *RTU estudijas*.
 
-1. Instalē **Termux** no F-Droid (ne Google Play versiju). Tad:
-   ```bash
-   pkg install python cronie termux-services termux-api   # + lietotne Termux:API no F-Droid paziņojumiem
-   termux-setup-storage
-   sv-enable crond
-   pip install -r requirements-termux.txt
-   ```
-2. Iekopē projekta mapi telefonā.
-3. Datorā pēc `login` paņem `<mape>/.estudijas-sync/auth.json` un pārsūti to uz telefonu. Termux palaid:
-   ```bash
-   python run.py import-auth /sdcard/Download/auth.json
-   ```
-4. Telefonā `config.toml` (pēc pirmās palaišanas tā ceļu parāda `python run.py status`) iestati:
-   ```toml
-   output_dir = "~/storage/shared/Documents/RTU"
-   only_categories = ["Mājas darbi"]
-   [calendar]
-   ics = false
-   ```
-   Kalendāru labāk atstāt datoram, lai notikumi nedublējas.
-5. Pārbaudi un ieslēdz automātisko palaišanu:
-   ```bash
-   python run.py sync
-   python run.py install-schedule
-   ```
-   Termux iestatījumos izslēdz akumulatora optimizāciju.
+**Google Drive (neobligāti):** ja datorā ir Google Drive for desktop, *Iestatījumi → Google Drive* → ieslēdz, izvēlies mapi (poga "Atrast Drive mapi") un iekopē tās saiti. Mājasdarbi būs pieejami telefona Drive lietotnē.
 
-Žetons ir derīgs vairākus mēnešus. Kad tas beidzas, datorā vēlreiz palaid `login` un iekopē jauno `auth.json`.
+---
 
-## Dalīšanās ar citiem
+## Dalīšanās ar draugiem
 
-Repozitorijs ir privāts. Lai draugs to varētu noklonēt un atjaunināt ar `update`, pievieno viņu kā līdzstrādnieku: GitHub → *Settings → Collaborators → Add people*. Viņam vajadzēs savu GitHub kontu, un pirmajā `git clone` reizē Git palūgs pieteikties.
+Draugam dod **programmu**, nevis savu mapi. Katrs piesakās ar savu RTU kontu un redz tikai savus kursus.
 
-Ar draugiem dalies ar **kodu**, nevis ar saviem failiem vai `auth.json`. Katrs pats palaiž `login` ar savu kontu, tāpēc katrs redz tikai savus kursus un savas grupas materiālus.
+1. GitHub repozitorijā → *Settings → Collaborators → Add people* → drauga GitHub konts.
+2. Draugs izpilda [Uzstādīšanu](#uzstādīšana-soli-pa-solim-windows) no 1. soļa.
 
-- `auth.json` ir **piekļuve tavam estudiju kontam**. Nesūti to citiem. Ja tas nonāk svešās rokās, atsauc to estudijās: *Preferences → Security keys → Reset*.
-- Vairāki konti vienā datorā: `python run.py --profile janis login`, `... --profile janis sync`, `... --profile janis install-schedule`.
-- Lekciju materiāli ir pasniedzēju darbs. Neliec tos publiski, piemēram, publiskā GitHub repozitorijā.
+Ja draugam nav GitHub konta: repozitorija lapā *Code → Download ZIP*, atarhivē un palaid `start.bat`. Atjaunināšanas poga šajā variantā nestrādā.
+
+**Nesūti** savu `RTU estudijas` mapi un slēpto `.estudijas-sync` mapi, jo tur ir tava pieteikšanās. Programmas mapē (`estudijas-sync`, kur ir `start.bat`) tavu datu nav.
+
+Google Calendar draugam: vai nu pievieno viņa Gmail kā Test user un iedod savu JSON failu (tas ir app identifikators, nevis tava piekļuve), vai arī viņš izveido savu projektu pēc instrukcijas augstāk.
+
+---
 
 ## Problēmas
 
-- Žurnāls: `<mape>/.estudijas-sync/sync.log` (panelī cilne *Help*).
-- "Sinhronizācija jau notiek" parādās tikai tad, ja tiešām notiek cita sinhronizācija, piemēram, automātiskā. Pagaidi, kamēr tā beigsies.
-- Mainīgs fails nonāk nepareizā mapē? Papildini regulāro izteiksmi `[categories]` sadaļā.
-- Testi bez interneta: `python tests/test_all.py`.
+- **Žurnāls**: panelī cilne *Help*, kā arī `<mape>\.estudijas-sync\sync.log`.
+- **"Sinhronizācija jau notiek"**: tiešām notiek cita sinhronizācija (piemēram, automātiskā). Pagaidi.
+- **`python` vai `git` nav atrasts**: uzinstalē no jauna (Python ar atzīmētu "Add to PATH") un atver `cmd` no jauna.
+- **Fails nonāk nepareizā mapē**: `config.toml` sadaļā `[categories]` papildini noteikumus. Panelī: *Iestatījumi → Atvērt config.toml*.
+- **"API žetonu iegūt neizdevās"**: programma izmanto pārlūka režīmu, un ik pa laikam atvērsies Microsoft logs pieteikšanās veikšanai.
+- **Google kļūdas**: panelis parāda, kas jādara (piemēram, ieslēgt API vai pievienot Test user).
+
+---
+
+## Terminālim (papildus)
+
+Visu var darīt arī bez paneļa, mapē `estudijas-sync`:
+
+| Komanda | Ko dara |
+|---|---|
+| `python run.py web` | atver paneli |
+| `python run.py init` | pajautā programmu un grupu |
+| `python run.py login` | piesakās (Microsoft logs) |
+| `python run.py sync` | sinhronizē (ar progresa joslu) |
+| `python run.py status` | tuvākie termiņi |
+| `python run.py install-schedule` / `uninstall-schedule` | automātiskā sinhronizācija |
+| `python run.py set-folder "D:\RTU estudijas"` | maina mapi un pārvieto failus |
+| `python run.py gcal-auth --credentials fails.json` | savieno Google Calendar |
+| `python run.py update` | atjaunina no GitHub |
+| `python run.py --profile janis …` | otrs konts tajā pašā datorā |
+
+**Telefons (Android, Termux):** programmu var darbināt arī Termux un lejupielādēt tikai mājasdarbus (`only_categories = ["Mājas darbi"]`). Pieteikšanos izdara datorā un uz telefonu ar `python run.py import-auth auth.json` pārnes `auth.json`. Vienkāršāk ir lietot Google Drive kopēšanu.
+
+Privātuma politika: [PRIVACY.md](PRIVACY.md).

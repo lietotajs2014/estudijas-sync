@@ -594,11 +594,20 @@ function md(text) {
   if (!text) return el("p", { class: "muted", text: "Nav satura." });
   const box = el("div");
   box.innerHTML = (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(text)) : miniMd(text);
+  // virsrakstiem id (GitHub stilā), lai #saites instrukcijā strādātu
+  const slug = t => t.trim().toLowerCase().replace(/[^\p{L}\p{N}\s-]/gu, "").replace(/\s/g, "-");
+  $$("h1, h2, h3, h4", box).forEach(h => { if (!h.id) h.id = slug(h.textContent); });
   // lokālās saites (faili izvades mapē) atver datorā
   $$("a", box).forEach(a => {
     const href = a.getAttribute("href") || "";
     if (/^https?:/i.test(href)) { a.target = "_blank"; a.rel = "noopener"; return; }
-    if (href.startsWith("#")) return;
+    if (href.startsWith("#")) {
+      a.addEventListener("click", e => { e.preventDefault();
+        const t = box.querySelector(`[id="${CSS.escape(decodeURIComponent(href.slice(1)))}"]`);
+        if (t) t.scrollIntoView({ behavior: "smooth" }); });
+      return;
+    }
+    if (/\.md$/i.test(href) && !href.includes("/")) return;
     a.addEventListener("click", e => { e.preventDefault(); openPath(decodeURIComponent(href.replace(/^<|>$/g, ""))); });
   });
   return box;
@@ -611,6 +620,7 @@ function miniMd(src) {
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    .replace(/(^|[\s(→])\*([^*\n]+?)\*(?=[\s).,:;→]|$)/g, "$1<em>$2</em>")
     .replace(/(^|[\s(])_([^_]+)_(?=[\s).,]|$)/g, "$1<em>$2</em>")
     .replace(/\[([^\]]+)\]\(&lt;([^)]*?)&gt;\)|\[([^\]]+)\]\(([^)\s]+)\)/g,
       (m, t1, u1, t2, u2) => `<a href="${(u1 || u2).replace(/^javascript:/i, "")}">${t1 || t2}</a>`);
@@ -620,6 +630,7 @@ function miniMd(src) {
     const ln = lines[i];
     if (/^```/.test(ln)) { const buf = []; i++; while (i < lines.length && !/^```/.test(lines[i])) buf.push(lines[i++]); i++;
       html += `<pre><code>${esc(buf.join("\n"))}</code></pre>`; continue; }
+    if (/^\s*-{3,}\s*$/.test(ln)) { html += "<hr>"; i++; continue; }
     const h = ln.match(/^(#{1,4})\s+(.*)$/);
     if (h) { html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; i++; continue; }
     if (/^\s*\|/.test(ln)) { const rows = []; while (i < lines.length && /^\s*\|/.test(lines[i])) rows.push(lines[i++]);
