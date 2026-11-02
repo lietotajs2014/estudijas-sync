@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,7 +7,7 @@ plugins {
 
 // Paraksta atslēga: no vides mainīgajiem (GitHub Actions secrets) vai android/keystore.properties
 val ksFile = rootProject.file("keystore.properties")
-val ks = java.util.Properties().apply { if (ksFile.exists()) ksFile.inputStream().use { load(it) } }
+val ks = Properties().apply { if (ksFile.exists()) ksFile.inputStream().use { load(it) } }
 fun sign(key: String): String? = System.getenv(key) ?: ks.getProperty(key)
 
 android {
