@@ -122,6 +122,8 @@ h3:first-child { margin-top: 0; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 .chip { border: 1px solid var(--line); background: var(--sheet); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--sheet); }
+.offline { position: sticky; top: 0; z-index: 20; background: var(--bad); color: #fff; padding: 10px 16px; text-align: center; font-weight: 500; }
+.offline[hidden] { display: none; }
 .gcal-warn { margin: 8px 0 0; color: var(--bad); font-weight: 500; }
 .gcal-warn[hidden] { display: none; }
 .linkish { background: none; border: 0; padding: 0; color: var(--md); cursor: pointer; font: inherit; text-decoration: underline; }
@@ -288,6 +290,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 </style>
 </head>
 <body>
+<div class="offline" id="offline" hidden role="alert">Savienojums ar programmu pazudis. Pārbaudi, vai <b>start.bat</b> logs ir atvērts; ja nav, palaid to vēlreiz un pārlādē šo lapu.</div>
 <div class="sheet-top">
   <div class="wrap">
     <div class="head">
@@ -575,12 +578,25 @@ const el = (tag, attrs = {}, ...kids) => {
   return e;
 };
 
+const OFFLINE_MSG = "Panelis nesasniedz programmu. Pārbaudi, vai start.bat logs ir atvērts (ja nav, palaid start.bat vēlreiz), un pārlādē šo lapu.";
 async function api(path, opts = {}) {
-  const r = await fetch(path, { ...opts, headers: { "X-Token": TOKEN, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  let r;
+  try {
+    r = await fetch(path, { ...opts, headers: { "X-Token": TOKEN, "Content-Type": "application/json", ...(opts.headers || {}) } });
+  } catch (e) {
+    setOffline(true);
+    throw new Error(OFFLINE_MSG);
+  }
+  setOffline(false);
+  if (r.status === 401) throw new Error("Panelis ir pārstartēts. Pārlādē lapu (F5).");
   const ct = r.headers.get("content-type") || "";
   const data = ct.includes("json") ? await r.json() : await r.text();
   if (!r.ok) throw new Error((data && (data.error || data.message)) || `HTTP ${r.status}`);
   return data;
+}
+function setOffline(off) {
+  const b = document.getElementById("offline");
+  if (b) b.hidden = !off;
 }
 const post = (path, body = {}) => api(path, { method: "POST", body: JSON.stringify(body) });
 
@@ -684,7 +700,8 @@ let STATUS = {}, VIEW = {}, CONFIG = null, FILES = [];
 const ui = { kinds: new Set(), q: "", showDone: false, showText: true, showPast: false };
 
 async function loadStatus() {
-  try { STATUS = await api("/api/status"); } catch (e) { return; }
+  try { STATUS = await api("/api/status"); }
+  catch (e) { clearTimeout(pollTimer); pollTimer = setTimeout(loadStatus, 5000); return; }
   const s = STATUS;
   $("#st-user").textContent = s.auth.fullname || VIEW.user || (s.auth.mode ? "pieteicies" : "nav pieteicies");
   $("#st-last").textContent = s.last_run ? ago(s.last_run) : "vēl nav";

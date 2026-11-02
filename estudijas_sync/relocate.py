@@ -24,6 +24,9 @@ root = tk.Tk()
 root.withdraw()
 try:
     root.attributes("-topmost", True)
+    root.lift()
+    root.focus_force()
+    root.update()
 except Exception:
     pass
 mode, init = sys.argv[1], (sys.argv[2] if len(sys.argv) > 2 else None)
@@ -51,15 +54,22 @@ def pick_file(initial: str = "") -> str | None:
 def _pick(mode: str, initial: str) -> str | None:
     init = initial if initial and Path(initial).exists() else str(Path.home() / "Downloads") \
         if (Path.home() / "Downloads").exists() and mode == "file" else str(Path.home())
-    r = subprocess.run([sys.executable, "-c", _PICKER, mode, init], capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", timeout=600, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    try:
+        r = _run_picker(mode, init)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Izvēles logs netika aizvērts 5 minūšu laikā. Ieraksti ceļu pats.")
     if r.returncode == 3:
         raise RuntimeError("Izvēles logs nav pieejams (nav tkinter). Ieraksti ceļu pats.")
     if r.returncode != 0:
         raise RuntimeError(r.stderr.strip()[-300:] or "Izvēle neizdevās")
     path = r.stdout.strip()
     return str(Path(path)) if path else None
+
+
+def _run_picker(mode: str, init: str):
+    return subprocess.run([sys.executable, "-c", _PICKER, mode, init], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=300, env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
 def _same(a: Path, b: Path) -> bool:
