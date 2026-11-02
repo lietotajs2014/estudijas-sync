@@ -99,6 +99,7 @@ class CollectResult:
     texts: list[TextBlock] = field(default_factory=list)
     links: list[Link] = field(default_factory=list)
     groups: dict[int, list[str]] = field(default_factory=dict)
+    teachers: dict[int, list[dict]] = field(default_factory=dict)  # {kurss: [{name, email, url, role}]}
     warnings: list[str] = field(default_factory=list)
 
     def add_deadline(self, d: Deadline) -> None:

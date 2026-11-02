@@ -250,8 +250,14 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
         report = sync_files(cfg, src, result.files, course_dirs, state, redownload, matchers, prog)
 
     by_id = {c.id: c for c in courses}
-    window = [d for d in result.deadlines.values()
-              if now - timedelta(days=cfg.lookback_days) <= d.due <= now + timedelta(days=cfg.lookahead_days)]
+    window = list(result.deadlines.values())  # visi zināmie termiņi (kursi ir tikai pašreizējie)
+    from . import consult
+    window, consult_events = consult.split_consult_events(window)
+    consult_data = consult.build([c.id for c in courses], result.teachers, result.texts, consult_events, now)
+    for c in courses:
+        from .util import write_if_changed
+        write_if_changed(out / names[c.id] / "_info" / "Konsultācijas un pasniedzēji.md",
+                         consult.to_markdown(c.fullname, c.url, consult_data[c.id]))
     for d in window:
         m = matchers.get(d.course_id)
         if m:
@@ -261,7 +267,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
     others = [d for d in window if not keep_all and d.relevance == OTHER]
     hidden = {(d.course_id, d.title) for d in others}
     scan = [t for t in result.texts if not (t.kind == "uzdevums" and (t.course_id, t.title) in hidden)]
-    text_dl = find_text_deadlines(scan, matchers, moodle, now, tz, cfg.lookahead_days)
+    text_dl = find_text_deadlines(scan, matchers, moodle, now, tz, cfg.lookahead_days, cfg.lookback_days)
 
     for c in courses:
         write_course_info(out, c, names[c.id], [d for d in moodle if d.course_id == c.id],
@@ -269,7 +275,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
                           [ln for ln in result.links if ln.course_id == c.id], result.groups.get(c.id, []),
                           [d for d in others if d.course_id == c.id])
 
-    cal = list(moodle)
+    cal = list(moodle) + [d for d in consult_events if keep_all or d.relevance != OTHER]
     if cfg.include_text_dates:
         cal += [d for d in text_dl if keep_all or d.relevance != OTHER]
     warnings = list(result.warnings)
@@ -310,7 +316,7 @@ def run_sync(cfg: Config, redownload: bool = False, no_calendar: bool = False, p
             warnings.append(f"Drive: {e}")
 
     write_view(cfg, now, info, by_id, names, moodle, text_dl, others, ch, changes_md, report, warnings,
-               describe_filter(cfg, matchers), drive_copied, gcal_changes)
+               describe_filter(cfg, matchers), drive_copied, gcal_changes, consult_data)
 
     state.data["last_run"] = now.isoformat(timespec="seconds")
     state.data["upcoming"] = [
@@ -349,7 +355,8 @@ def _dl_json(d, by_id: dict) -> dict:
 
 
 def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, text_dl, others, ch, changes_md,
-               report: dict, warnings: list[str], filter_desc: str, drive_copied: list[str], gcal_changes) -> None:
+               report: dict, warnings: list[str], filter_desc: str, drive_copied: list[str], gcal_changes,
+               consult_data: dict | None = None) -> None:
     """Dati web panelim (view.json profila mapē)."""
     import json
     lo = now - timedelta(days=cfg.lookback_days)
@@ -367,6 +374,9 @@ def write_view(cfg: Config, now, info: dict, by_id: dict, names: dict, moodle, t
         "report": {k: report.get(k, []) for k in ("new", "updated", "skipped", "errors", "other")},
         "warnings": warnings,
         "drive_copied": drive_copied,
+        "consult": [dict(data, course_id=cid, course=by_id[cid].label, course_full=by_id[cid].fullname, url=by_id[cid].url)
+                    for cid, data in sorted((consult_data or {}).items(), key=lambda kv: by_id[kv[0]].fullname)
+                    if cid in by_id],
         "files": [dict(r, course=by_id[r["course_id"]].label if r["course_id"] in by_id else "",
                        course_full=by_id[r["course_id"]].fullname if r["course_id"] in by_id else "")
                   for r in report.get("catalog", [])],

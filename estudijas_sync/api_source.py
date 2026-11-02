@@ -58,7 +58,7 @@ class ApiSource:
         prog = prog or NullProgress()
         res = CollectResult()
         ids = [c.id for c in courses]
-        global_steps = (("uzdevumi", self._assignments), ("testi", self._quizzes),
+        global_steps = (("pasniedzēji", self._teachers), ("uzdevumi", self._assignments), ("testi", self._quizzes),
                         ("kalendārs", self._calendar), ("paziņojumi", self._forums))
         prog.start("Nolasa estudijas", len(courses) + len(global_steps))
         for c in courses:
@@ -87,6 +87,29 @@ class ApiSource:
         return res
 
     # ---------------------------------------------------------------
+    def _teachers(self, ids: list[int], res: CollectResult) -> None:
+        data = self.api.call("core_course_get_courses_by_field", field="ids", value=",".join(map(str, ids)))
+        contacts: dict[int, list[dict]] = {}
+        uids: set[int] = set()
+        for c in data.get("courses", []):
+            lst = [{"id": int(x["id"]), "name": x.get("fullname", "")} for x in c.get("contacts", []) or []]
+            contacts[int(c["id"])] = lst
+            uids.update(x["id"] for x in lst)
+        users: dict[int, dict] = {}
+        if uids:
+            try:
+                for u in self.api.call("core_user_get_users_by_field", field="id", values=sorted(uids)):
+                    users[int(u["id"])] = u
+            except MoodleError as e:
+                log.info("Pasniedzēju profili: %s", e)
+        for cid, lst in contacts.items():
+            res.teachers[cid] = [{
+                "name": users.get(x["id"], {}).get("fullname") or x["name"],
+                "email": users.get(x["id"], {}).get("email", ""),
+                "department": users.get(x["id"], {}).get("department", ""),
+                "url": f"{self.site}/user/view.php?id={x['id']}&course={cid}",
+                "role": "pasniedzējs"} for x in lst]
+
     def _groups(self, c: Course, res: CollectResult) -> None:
         if not self.userid:
             return
@@ -156,7 +179,6 @@ class ApiSource:
 
     def _assignments(self, ids: list[int], res: CollectResult) -> None:
         data = self.api.call("mod_assign_get_assignments", courseids=ids)
-        now = time.time()
         for course in data.get("courses", []):
             cid = int(course["id"])
             for a in course.get("assignments", []):
@@ -183,8 +205,7 @@ class ApiSource:
                 if not due:
                     continue
                 status = None
-                if now - self.cfg.lookback_days * 86400 < due < now + self.cfg.lookahead_days * 86400:
-                    status = self._assign_status(a["id"])
+                status = self._assign_status(a["id"])
                 details = intro[:5000]
                 if a.get("cutoffdate"):
                     details = f"Galīgais termiņš: {self._fmt(a['cutoffdate'])}\n{details}"
@@ -260,7 +281,7 @@ class ApiSource:
                 kind=classify_kind(f"{name} {desc}", "Notikums"), title=name,
                 due=start + timedelta(seconds=dur) if dur else start, start=start if dur else None,
                 url=e.get("url") or f"{self.site}/calendar/view.php?view=day&time={e.get('timestart')}",
-                details=desc[:3000]))
+                details=(f"Vieta: {e['location']}\n" if e.get("location") else "") + desc[:3000]))
 
     def _forums(self, ids: list[int], res: CollectResult) -> None:
         forums = self.api.call("mod_forum_get_forums_by_courses", courseids=ids)

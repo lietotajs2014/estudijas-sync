@@ -159,13 +159,13 @@ GENERATED_PREFIXES = ("Iesniegšana no:", "Termiņš:", "Galīgais termiņš", "
 
 
 def find_text_deadlines(texts: list[TextBlock], matchers: dict, existing: list[Deadline], now: datetime,
-                        tz: tzinfo, lookahead_days: int) -> list[Deadline]:
+                        tz: tzinfo, lookahead_days: int, lookback_days: int = 1) -> list[Deadline]:
     """Meklē kursu tekstos (paziņojumos, lapās, aprakstos) termiņus, kas nav Moodle kalendārā.
     `matchers` — {kursa_id: relevance.Matcher}, lai atšķirtu tavas grupas/programmas datumus."""
     from .relevance import OTHER, Matcher
     out: dict[tuple, Deadline] = {}
     now_naive = now.astimezone(tz).replace(tzinfo=None)
-    lo, hi = now - timedelta(days=1), now + timedelta(days=lookahead_days)
+    lo, hi = now - timedelta(days=lookback_days), now + timedelta(days=lookahead_days)
     moodle_days = {(d.course_id, d.due.astimezone(tz).date()) for d in existing}
     for tb in texts:
         m = matchers.get(tb.course_id) or Matcher()

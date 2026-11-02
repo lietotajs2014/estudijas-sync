@@ -15,7 +15,7 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 # Google Calendar krāsas: 10 zaļa (Basil), 11 sarkana (Tomato), 8 pelēka (Graphite), 3 violeta (Grape),
 # 9 zila (Blueberry), 5 dzeltena (Banana), 7 tirkīza (Peacock)
 COLOR_DONE, COLOR_OVERDUE, COLOR_PAST = "10", "11", "8"
-KIND_COLORS = {"KD": "3", "Eksāmens": "3", "Tests": "5", "MD": "9", "LD": "7", "PD": "7"}
+KIND_COLORS = {"KD": "3", "Eksāmens": "3", "Tests": "5", "MD": "9", "LD": "7", "PD": "7", "Konsultācija": "2"}
 
 
 def color_for(d: Deadline, now: datetime) -> str | None:

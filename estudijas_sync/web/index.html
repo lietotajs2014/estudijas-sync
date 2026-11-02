@@ -226,6 +226,20 @@ button.title:hover { text-decoration: underline; }
   .facts { grid-template-columns: 1fr; gap: 0 0; }
   .facts dd { margin-bottom: 6px; }
 }
+.ccard { background: var(--sheet); border: 1px solid var(--line); border-left: 4px solid var(--ink); border-radius: var(--radius-m); padding: 14px 18px; margin-bottom: 14px; scroll-margin-top: 16px; }
+.ccard.flash { outline: 3px solid var(--bad); outline-offset: 2px; }
+.ccard h4 { font: 600 18px/1.25 var(--font-head); margin: 0 0 8px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.ccard h4 a { font: 500 14px/1.4 var(--font); }
+.ccard .people { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-bottom: 10px; }
+.ccard .person b { display: block; font-weight: 600; }
+.ccard .person a, .ccard .person span { font-size: 14px; }
+.citem { border-top: 1px solid var(--line); padding: 8px 0; }
+.citem pre { white-space: pre-wrap; font: 15px/1.5 var(--font); margin: 0; }
+.citem .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 13px; }
+.citem .tags span { border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.citem small { color: var(--ink-soft); }
+.cevent { font-weight: 600; }
+.dl .consult-link { color: var(--bad); }
 .folder-row { display: flex; gap: 8px; align-items: center; }
 .folder-row input { flex: 1; min-width: 0; }
 .move-box { margin-top: 10px; padding: 12px 14px; border: 2px solid var(--md); border-radius: var(--radius-m); background: color-mix(in srgb, var(--md) 7%, transparent); }
@@ -302,12 +316,11 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 <div class="wrap">
   <nav class="tabs" role="tablist" id="tabs">
     <button role="tab" data-tab="termini" aria-selected="true">Termiņi<span class="count" id="cnt-dl"></span></button>
+    <button role="tab" data-tab="konsultacijas" aria-selected="false">Konsultācijas</button>
     <button role="tab" data-tab="jaunumi" aria-selected="false">Jaunumi<span class="count" id="cnt-new"></span></button>
     <button role="tab" data-tab="faili" aria-selected="false">Faili</button>
     <button role="tab" data-tab="iestatijumi" aria-selected="false">Iestatījumi</button>
-    <button role="tab" data-tab="konts" aria-selected="false">Konts</button>
-    <button role="tab" data-tab="readme" aria-selected="false">Instrukcija</button>
-    <button role="tab" data-tab="zurnals" aria-selected="false">Žurnāls</button>
+    <button role="tab" data-tab="help" aria-selected="false">Help</button>
   </nav>
 
   <main>
@@ -327,6 +340,15 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
         <span><i style="--c:var(--ink)"></i>gaidāms</span></div>
       <div id="dl-list"></div>
       <div id="hidden-box"></div>
+    </section>
+
+    <!-- KONSULTĀCIJAS -->
+    <section data-panel="konsultacijas" hidden>
+      <div class="filters">
+        <input class="search" id="cq" type="search" placeholder="Meklēt kursu, pasniedzēju vai vietu" aria-label="Meklēt konsultācijās">
+      </div>
+      <p class="note">Pasniedzēji ir kursu kontaktpersonas no estudijām. Laiki un vietas atrasti kursu aprakstos, paziņojumos un kalendārā, tāpēc pirms iešanas pārbaudi avotu.</p>
+      <div id="consult"></div>
     </section>
 
     <!-- JAUNUMI -->
@@ -369,6 +391,7 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
 
     <!-- IESTATĪJUMI -->
     <section data-panel="iestatijumi" hidden>
+      <div class="panel" id="account"></div>
       <form id="cfg-form" autocomplete="off">
         <div class="panel">
           <h4>Par tevi</h4>
@@ -489,22 +512,15 @@ footer button.link { background: none; border: 0; color: var(--md); cursor: poin
       </form>
     </section>
 
-    <!-- KONTS -->
-    <section data-panel="konts" hidden>
-      <div class="panel" id="account"></div>
-      <div class="panel">
-        <h4>Kā notiek pieteikšanās</h4>
-        <p class="note">Poga atver Microsoft logu. Tur ievadi paroli un, ja prasa, MFA kodu. Pēc tam skripts saņem Moodle lietotnes piekļuves atslēgu, kas derīga apmēram trīs mēnešus. Paroli neredz ne skripts, ne šis panelis. Atslēgu jebkurā brīdī var atsaukt estudijās: Preferences, Security keys.</p>
+    <!-- HELP -->
+    <section data-panel="help" hidden>
+      <div class="help-nav filters">
+        <a class="btn ghost small" href="#help-readme">Instrukcija</a>
+        <a class="btn ghost small" href="#help-log">Žurnāls</a>
       </div>
-    </section>
-
-    <!-- README -->
-    <section data-panel="readme" hidden>
+      <h3 id="help-readme">Instrukcija</h3>
       <div class="doc" id="readme"></div>
-    </section>
-
-    <!-- ŽURNĀLS -->
-    <section data-panel="zurnals" hidden>
+      <h3 id="help-log">Žurnāls</h3>
       <div class="filters">
         <button class="btn small ghost" type="button" id="reload-log">Atjaunot</button>
         <button class="btn small ghost" type="button" id="open-data">Atvērt datu mapi</button>
@@ -696,7 +712,7 @@ async function loadView() {
   try { VIEW = await api("/api/view"); } catch (e) { VIEW = {}; }
   $("#st-filter").textContent = VIEW.filter || (CONFIG && CONFIG.values.program ? `${CONFIG.values.program}, ${CONFIG.values.group}. gr.` : "nav norādīta");
   if (VIEW.user) $("#st-user").textContent = VIEW.user;
-  renderTimeline(); renderDeadlines(); renderChanges();
+  renderTimeline(); renderDeadlines(); renderChanges(); renderConsult();
 }
 
 /* ---------- laika ass ---------- */
@@ -761,6 +777,9 @@ function dlRow(d) {
     el("span", { class: "kind", style: `--c:${KIND[d.kind] || "var(--muted)"}`, text: d.kind }),
     el("button", { class: "title", type: "button", text: shownTitle, onclick: () => openDeadline(d) }),
     meta);
+  const isOverdue = !d.done && d.status && new Date(d.due) < new Date();
+  if (isOverdue && consultFor(d.course_id)) body.append(el("button", { class: "linkish small-link consult-link", type: "button",
+    onclick: () => gotoConsult(d.course_id), text: "Konsultācijas šim kursam" }), " ");
   const nf = relatedFiles(d).length;
   if (d.details || nf) body.append(el("button", { class: "linkish small-link", type: "button", onclick: () => openDeadline(d),
     text: [d.details ? "Pilns apraksts" : "", nf ? `${nf} ${nf === 1 ? "fails" : "faili"}` : ""].filter(Boolean).join(", ") }));
@@ -1010,6 +1029,49 @@ async function downloadKeys(keys) {
 }
 async function reveal(p) { try { await post("/api/reveal", { path: p }); } catch (e) { toast(e.message, true); } }
 
+/* ---------- konsultācijas ---------- */
+function consultFor(courseId) { return (VIEW.consult || []).find(c => c.course_id === courseId); }
+function hasConsultInfo(c) { return c && (c.teachers.length || c.other_emails.length || c.items.length || c.events.length); }
+function gotoConsult(courseId) {
+  $("#dlg").open && $("#dlg").close();
+  showTab("konsultacijas");
+  const card = document.getElementById(`consult-${courseId}`);
+  if (card) { card.scrollIntoView({ behavior: "smooth", block: "start" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1800); }
+}
+function renderConsult() {
+  const box = $("#consult"); box.replaceChildren();
+  const list = VIEW.consult || [];
+  if (!list.length) { box.append(el("div", { class: "empty", text: VIEW.generated ? "Sinhronizē vēlreiz, lai savāktu konsultāciju informāciju." : "Vispirms sinhronizē." })); return; }
+  const q = ($("#cq").value || "").toLowerCase();
+  const sorted = [...list].sort((a, b) => (hasConsultInfo(b) ? 1 : 0) - (hasConsultInfo(a) ? 1 : 0) || a.course_full.localeCompare(b.course_full));
+  let shown = 0;
+  for (const c of sorted) {
+    const hay = [c.course_full, ...c.teachers.map(t => `${t.name} ${t.email}`), ...c.items.map(i => i.text), ...c.other_emails.map(m => `${m.name} ${m.email}`)].join(" ").toLowerCase();
+    if (q && !hay.includes(q)) continue;
+    shown++;
+    const people = [...c.teachers.map(t => el("div", { class: "person" }, el("b", { text: t.name }),
+        t.email ? el("a", { href: `mailto:${t.email}`, text: t.email }) : el("span", { class: "muted", text: "e-pasts nav redzams" }),
+        t.url ? el("a", { href: t.url, target: "_blank", rel: "noopener", style: "margin-left:10px", text: "profils" }) : null)),
+      ...c.other_emails.map(m => el("div", { class: "person" }, el("b", { text: m.name || "E-pasts no kursa teksta" }),
+        el("a", { href: `mailto:${m.email}`, text: m.email })))];
+    const card = el("div", { class: "ccard", id: `consult-${c.course_id}` },
+      el("h4", {}, el("span", { text: c.course_full }), el("a", { href: c.url, target: "_blank", rel: "noopener", text: "Atvērt kursu" })),
+      people.length ? el("div", { class: "people" }, people) : el("p", { class: "note", text: "Pasniedzēji nav norādīti." }));
+    for (const e of c.events) card.append(el("div", { class: "citem" },
+      el("div", { class: "cevent", text: `${fmtDate(e.start)}–${fmtDate(e.end).split(" ").pop()} ${e.title}` }),
+      e.place ? el("div", { class: "tags" }, el("span", { text: e.place })) : null,
+      e.url ? el("small", {}, el("a", { href: e.url, target: "_blank", rel: "noopener", text: "kalendārā" })) : null));
+    for (const i of c.items) card.append(el("div", { class: "citem" },
+      el("pre", { text: i.text }),
+      (i.when || i.place) ? el("div", { class: "tags" }, i.when ? el("span", { text: i.when }) : null, i.place ? el("span", { text: i.place }) : null) : null,
+      ...i.links.map(u => el("a", { href: u, target: "_blank", rel: "noopener", style: "font-size:14px;margin-right:10px", text: /teams|zoom/i.test(u) ? "pievienoties tiešsaistē" : u })),
+      el("small", {}, "Avots: ", el("a", { href: i.url, target: "_blank", rel: "noopener", text: i.source }))));
+    if (!c.items.length && !c.events.length) card.append(el("p", { class: "note", text: "Konsultāciju laiki kursā nav atrasti. Raksti pasniedzējam vai skaties RTU konsultāciju grafikā." }));
+    box.append(card);
+  }
+  if (!shown) box.append(el("div", { class: "empty", text: "Nekas neatbilst meklētajam." }));
+}
+
 /* ---------- termiņa logs ---------- */
 function openDeadline(d) {
   const dlg = $("#dlg"), guess = d.source === "teksts";
@@ -1040,7 +1102,16 @@ function openDeadline(d) {
     if (missing.length > 1) body.push(el("button", { class: "btn small", type: "button", style: "margin:-6px 0 16px",
       onclick: () => downloadKeys(missing.map(f => f.key)) }, `Lejupielādēt visus ${missing.length}`));
   }
+  const cons = consultFor(d.course_id);
+  const overdueD = !d.done && d.status && new Date(d.due) < new Date();
+  if (overdueD && cons) {
+    const t = cons.teachers.filter(x => x.email).concat(cons.other_emails);
+    body.push(el("p", { class: "note", style: "color:var(--bad)" }, "Termiņš ir nokavēts. ",
+      t.length ? ["Pasniedzējs: ", ...t.slice(0, 2).flatMap((x, k) => [k ? ", " : "", el("a", { href: `mailto:${x.email}`, text: `${x.name || x.email}` })]), ". "] : null,
+      cons.items.length || cons.events.length ? "Konsultāciju laiki ir atrasti." : "Konsultāciju laiki kursā nav atrasti."));
+  }
   body.push(el("div", { class: "dlg-actions" },
+    cons && hasConsultInfo(cons) ? el("button", { class: overdueD ? "btn" : "btn ghost", type: "button", onclick: () => gotoConsult(d.course_id) }, "Konsultācijas") : null,
     d.url ? el("a", { class: "btn", href: d.url, target: "_blank", rel: "noopener" }, guess ? "Atvērt avotu estudijās" : "Atvērt estudijās") : null,
     course ? el("a", { class: "btn ghost", href: course.url, target: "_blank", rel: "noopener" }, "Atvērt kursu") : null,
     files.length ? el("button", { class: "btn ghost", type: "button", onclick: () => { dlg.close(); fui.dl = d.uid; fui.course = ""; fui.status = ""; $("#ff-status").value = ""; fui.cats.clear(); showTab("faili"); } }, "Rādīt failos") : null));
@@ -1123,7 +1194,7 @@ function renderSchedule() {
 /* ---------- konts ---------- */
 function renderAccount() {
   const a = STATUS.auth || {}, box = $("#account"); if (!box) return;
-  const kids = [el("h4", { text: "RTU konts" })];
+  const kids = [el("h4", { text: "RTU konts" }), el("p", { class: "note", text: "Pieteikšanās atver Microsoft logu: tur ievadi paroli un MFA kodu. Paroli neredz ne skripts, ne panelis; piekļuves atslēgu var atsaukt estudijās (Preferences, Security keys)." })];
   if (!a.mode) {
     kids.push(el("p", { class: "note", text: "Nav pieteicies. Ieraksti e-pastu iestatījumos un spied pogu: atvērsies Microsoft logs." }),
       el("div", { class: "row" }, el("button", { class: "btn", type: "button", onclick: startLogin }, "Pieteikties")));
@@ -1163,8 +1234,11 @@ async function loadLog() { try { $("#log").textContent = (await api("/api/log"))
 function showTab(name) {
   $$("#tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
   $$("section[data-panel]").forEach(s => s.hidden = s.dataset.panel !== name);
-  if (name === "readme" && !$("#readme").childElementCount) api("/api/doc?name=README").then(r => $("#readme").replaceChildren(md(r.text)));
-  if (name === "zurnals") loadLog();
+  if (name === "help") {
+    if (!$("#readme").childElementCount) api("/api/doc?name=README").then(r => $("#readme").replaceChildren(md(r.text)));
+    loadLog();
+  }
+  if (name === "konsultacijas") renderConsult();
   if (name === "faili") loadFiles().then(() => { $("#ff-dl").value = fui.dl; $("#ff-course").value = fui.course; renderFiles(); });
   try { localStorage.setItem("tab", name); } catch (e) { }
 }
@@ -1174,6 +1248,7 @@ $("#tabs").addEventListener("click", e => { const b = e.target.closest("button[d
 $("#btn-sync").addEventListener("click", startSync);
 $("#q").addEventListener("input", e => { ui.q = e.target.value; renderDeadlines(); });
 $("#gcal-reconnect").addEventListener("click", () => runJob("gcal"));
+$("#cq").addEventListener("input", renderConsult);
 $("#show-past").addEventListener("click", () => { ui.showPast = !ui.showPast; renderDeadlines(); });
 $("#dlg-close").addEventListener("click", () => $("#dlg").close());
 $("#dlg").addEventListener("click", e => { if (e.target.id === "dlg") $("#dlg").close(); });
@@ -1257,6 +1332,7 @@ renderKindFilters();
   await loadConfig().catch(() => { });
   await loadView();
   let tab = "termini"; try { tab = localStorage.getItem("tab") || tab; } catch (e) { }
+  tab = { konts: "iestatijumi", readme: "help", zurnals: "help" }[tab] || tab;
   showTab($(`#tabs button[data-tab="${tab}"]`) ? tab : "termini");
 })();
 </script>

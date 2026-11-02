@@ -15,6 +15,12 @@ Panelī ir:
   - Uzklikšķinot uz termiņa (laika asī vai sarakstā), atveras logs ar pilno aprakstu, termiņu, statusu, sadaļu, saistītajiem failiem un pogām **"Atvērt estudijās"** un **"Atvērt kursu"**.
   - Filtri: KD, MD, testi, LD/PD, meklēšana. Citām grupām paslēptais ir saliktā sadaļā.
 - **Sinhronizēt tagad** ar progresa joslu un pēdējās sinhronizācijas laiku.
+- **Konsultācijas** — katram kursam:
+  - pasniedzēji (kursa kontaktpersonas no estudijām) ar e-pastu un profila saiti;
+  - konsultāciju laiki un vietas, ko skripts atrod kursu aprakstos, paziņojumos un kalendārā, ar saiti uz avotu;
+  - gaidāmās konsultācijas no kursa kalendāra.
+
+  Pie **nokavētiem** darbiem ir sarkana saite "Konsultācijas šim kursam", un termiņa logā redzams pasniedzēja e-pasts. Katra kursa mapē ir arī `_info/Konsultācijas un pasniedzēji.md`.
 - **Jaunumi** — kas mainījies pēdējā reizē un visa vēsture.
 - **Faili** — visi kursu faili estudijās, ne tikai lejupielādētie.
   - Augšā redzams pilns ceļš uz mapi, kurā faili tiek saglabāti, un pogas "Atvērt mapi", "Mainīt mapi" un "Atvērt Google Drive".
@@ -28,8 +34,8 @@ Panelī ir:
   - Google Drive kopēšana un saite uz Drive mapi;
   - Google Calendar: `credentials.json` atrašanās vietu izvēlies ar **"Izvēlēties failu…"** (vai augšupielādē failu), tad spied "Savienot ar Google";
   - `.ics`, automātiskās palaišanas laiki un paziņojumi.
-- **Konts** — pieteikties, pieteikties no jauna vai aizmirst piekļuvi.
-- **Instrukcija** (šis fails) un **Žurnāls**.
+- Iestatījumu augšā ir **RTU konts**: pieteikties, pieteikties no jauna vai aizmirst piekļuvi.
+- **Help** — šī instrukcija un žurnāls.
 
 Panelis darbojas tikai tavā datorā (`127.0.0.1`), un citi tīkla dalībnieki tam nevar piekļūt. **Paroles lauka nav, un tas ir apzināti**: Microsoft pieteikšanās ar MFA notiek atvērtā logā, un e-pasts tiek aizpildīts automātiski. Automātiskās sinhronizācijas strādā arī tad, ja panelis ir aizvērts.
 
@@ -151,7 +157,7 @@ Tas nozīmē, ka estudijās nav ieslēgta mobilās lietotnes piekļuve. Tad skri
    Panelī to pašu dara poga "Izvēlēties failu…".
    Konfigurācijā ieliec `[calendar] google = true`.
 
-Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Tajā ir arī visi semestra pagājušie termiņi. Ieraksta krāsa mainās pēc statusa:
+Skripts izveido atsevišķu kalendāru **"RTU estudijas"**, tāpēc tavs galvenais kalendārs paliek tīrs. Tajā ir **visi zināmie termiņi**: visi estudiju uzdevumi un testi ar datumu (gan pagājušie, gan nākotnes), kursu kalendāra notikumi, konsultācijas un tekstā atrastie datumi (❓). Ieraksta krāsa mainās pēc statusa:
 - **zaļš** — iesniegts, izpildīts vai novērtēts (pie nosaukuma ✅);
 - **sarkans** — termiņš pagājis, nav iesniegts (⚠);
 - **pelēks** — pagājis notikums bez statusa;

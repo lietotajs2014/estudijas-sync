@@ -1,5 +1,6 @@
 """Testi bez interneta: python -m pytest tests  (vai python tests/test_all.py)"""
 import base64
+import json
 import hashlib
 import os
 import sys
@@ -111,6 +112,7 @@ def fake_api_responses():
                     {"type": "file", "filename": "MD1.pdf", "filepath": "/sagataves/", "fileurl": fu + "MD1.pdf",
                      "timemodified": 5, "filesize": 10}]},
                 {"id": 103, "modname": "label", "description": "<p>Laboratorijas darbs 2. grupai 25.11.</p>"},
+                {"id": 108, "modname": "label", "description": "<h4>Konsultācijas</h4><p>Otrdienās 14:30–16:00, Ķīpsalas iela 6A, 315. telpa</p><p>doc. Andris Ozols, andris.ozols@rtu.lv</p>"},
                 {"id": 104, "modname": "url", "name": "Simulators", "contents": [
                     {"type": "url", "fileurl": "https://falstad.com"}]},
                 {"id": 105, "modname": "resource", "name": "Video", "uservisible": True, "contents": [
@@ -125,6 +127,8 @@ def fake_api_responses():
                     {"type": "file", "filename": "LD1.pdf", "fileurl": fu + "LD1b.pdf", "timemodified": 1}]}]},
         ],
         "core_group_get_course_user_groups": {"groups": [{"name": "RMCE0 3. grupa"}]},
+        "core_course_get_courses_by_field": {"courses": [{"id": 10, "contacts": [{"id": 55, "fullname": "Andris Ozols"}]}]},
+        "core_user_get_users_by_field": [{"id": 55, "fullname": "Andris Ozols", "email": ""}],
         "mod_assign_get_assignments": {"courses": [{"id": 10, "assignments": [
             {"id": 1, "cmid": 201, "name": "MD1 — Kirhofa likumi", "duedate": now + 3 * day,
              "allowsubmissionsfromdate": now - 5 * day, "cutoffdate": 0, "intro": "<p>Atrisināt 5 uzdevumus.</p>",
@@ -139,7 +143,9 @@ def fake_api_responses():
         "mod_quiz_get_user_attempts": {"attempts": []},
         "core_calendar_get_calendar_events": {"events": [
             {"id": 9, "name": "Eksāmens", "courseid": 10, "eventtype": "course", "timestart": now + 60 * day,
-             "timeduration": 7200, "description": ""}]},
+             "timeduration": 7200, "description": ""},
+            {"id": 12, "name": "Konsultācija pirms KD", "courseid": 10, "eventtype": "course", "timestart": now + 4 * day,
+             "timeduration": 5400, "description": "", "location": "Āzenes 12, 208. aud."}]},
         "mod_forum_get_forums_by_courses": [{"id": 50, "course": 10, "type": "news", "name": "Paziņojumi"}],
         "mod_forum_get_forum_discussions": {"discussions": [
             {"name": "Izmaiņas", "message": "<p>MD2 termiņš pagarināts līdz 30.11. plkst. 23:59</p>",
@@ -242,6 +248,13 @@ def test_full_sync(tmp_path=None):
     syncmod.run_sync(cfg2)
     assert sorted(downloads) == ["MD1.pdf", "MD1_uzdevumi.pdf"], downloads   # bez program: nekas netiek atlasīts
     assert (cfg2.output_dir / "UZDEVUMI.md").exists()
+    view = json.loads((cfg.data_dir / "view.json").read_text(encoding="utf-8"))
+    cons = view["consult"][0]
+    assert cons["teachers"][0]["name"] == "Andris Ozols" and cons["teachers"][0]["email"] == "andris.ozols@rtu.lv", cons
+    assert any("14:30" in i["when"] and "Ķīpsalas iela 6A" in i["place"] for i in cons["items"]), cons["items"]
+    assert cons["events"][0]["title"] == "Konsultācija pirms KD" and "Āzenes 12" in cons["events"][0]["place"]
+    assert not any("Konsultācija" in d["title"] for d in view["deadlines"])
+    assert (c / "_info" / "Konsultācijas un pasniedzēji.md").exists()
     print((out / "UZDEVUMI.md").read_text(encoding="utf-8")[:1500])
 
 

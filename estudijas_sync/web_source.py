@@ -177,6 +177,14 @@ class WebSource:
                 log.exception(c.fullname)
                 res.warnings.append(f"{c.label}: {e}")
             prog.advance(c.label)
+        prog.label("pasniedzēji")
+        for c in courses:
+            try:
+                self._teachers(c, res)
+            except LoginRequired:
+                raise
+            except Exception as e:
+                log.info("%s pasniedzēji: %s", c.label, e)
         prog.label("kalendārs")
         try:
             self._calendar(courses, res)
@@ -291,6 +299,31 @@ class WebSource:
         elif mt == "forum":
             if first_forum or re.search(r"paziņoj|announce|jaunum|news", name, re.I):
                 self._forum(c, url, res)
+
+    def _teachers(self, c: Course, res: CollectResult) -> None:
+        """Kursa kontaktpersonas (course/info.php) un to e-pasti no profila lapas, ja redzami."""
+        soup = self.soup(f"{self.site}/course/info.php?id={c.id}")
+        links = soup.select('.teachers a[href*="user/"], .coursecontact a[href*="user/"], ul.teachers a')
+        out, seen = [], set()
+        for a in links[:8]:
+            href = urljoin(self.site, a.get("href", ""))
+            m = re.search(r"[?&]id=(\d+)", href)
+            if not m or m.group(1) in seen:
+                continue
+            seen.add(m.group(1))
+            url = f"{self.site}/user/view.php?id={m.group(1)}&course={c.id}"
+            email = ""
+            try:
+                prof = self.soup(url)
+                mail = prof.select_one('a[href^="mailto:"]')
+                email = mail["href"][7:].split("?")[0] if mail else ""
+            except LoginRequired:
+                raise
+            except Exception:
+                pass
+            out.append({"name": _clean_name(a), "email": email, "url": url, "role": "pasniedzējs"})
+        if out:
+            res.teachers[c.id] = out
 
     def _intro_text(self, soup: BeautifulSoup) -> str:
         el = soup.select_one(".activity-description, #intro, .box.generalbox")

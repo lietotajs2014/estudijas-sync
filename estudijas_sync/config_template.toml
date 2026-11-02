@@ -39,9 +39,10 @@ only_categories = []
 download_max_mb = 200
 skip_extensions = [".mp4", ".mkv", ".avi", ".mov", ".wmv"]
 
-# Cik dienas uz priekšu un atpakaļ skatīties termiņus (atpakaļ — lai kalendārā un panelī būtu viss semestris)
-lookahead_days = 150
-lookback_days = 200
+# Moodle termiņi tiek ņemti visi. Šie logi attiecas uz kursa kalendāra notikumiem un tekstā atrastajiem datumiem
+# (mazāk par 365 netiek lietots).
+lookahead_days = 365
+lookback_days = 365
 
 # Paziņojums (Windows/macOS/Linux/Termux), ja kopš iepriekšējās reizes kaut kas mainījies.
 # Visi jaunumi tiek rakstīti arī JAUNUMI.md un UZDEVUMI.md augšā.
