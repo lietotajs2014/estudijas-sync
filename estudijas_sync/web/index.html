@@ -770,6 +770,13 @@ async function loadStatus() {
   try { STATUS = await api("/api/status"); }
   catch (e) { clearTimeout(pollTimer); pollTimer = setTimeout(loadStatus, 5000); return; }
   const s = STATUS;
+  if (s.test_mode && !$("#test-banner")) {        // /test: pagaidu konts "kā jauns lietotājs"
+    document.body.prepend(el("div", { id: "test-banner", role: "status",
+      style: "position:sticky;top:0;z-index:50;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 16px;background:#7a4b00;color:#fff;font-size:14px" },
+      el("b", { text: "TESTA REŽĪMS" }), el("span", { text: "Tu redzi lapu kā jauns lietotājs. Tavs konts nav aiztikts.", style: "flex:1;min-width:200px" }),
+      el("a", { href: "/test", text: "Sākt no jauna", style: "color:#fff" }),
+      el("button", { class: "btn small", type: "button", onclick: () => postForm("/test/end") }, "Beigt testu")));
+  }
   $("#st-user").textContent = s.auth.fullname || VIEW.user || (s.auth.mode ? "pieteicies" : "nav pieteicies");
   $("#st-last").textContent = s.last_run ? ago(s.last_run) : "vēl nav";
   $("#st-last").title = s.last_run ? fmtDate(s.last_run) : "";

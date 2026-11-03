@@ -46,7 +46,7 @@ PANEL_CSP = ("default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnj
 def _session_user(request: Request, db: Session) -> User | None:
     uid = request.session.get("uid")
     user = db.get(User, uid) if uid else None
-    if not user or not settings.email_allowed(user.email):
+    if not user or not user.allowed:
         return None
     return user
 
@@ -112,6 +112,7 @@ def status_dict(user: User) -> dict:
         "job": job, "last_job": jobinfo.get("last_job"), "progress": progress,
         "output_dir": "serverī (tikai atzīmētie faili)",
         "account": {"email": user.email, "name": user.name},
+        "test_mode": user.is_test,
         "rtu_email": p.get("rtu_email", ""),
         "drive": {"connected": has_scope(user, DRIVE_SCOPE), "enabled": bool(user.drive_enabled and has_scope(user, DRIVE_SCOPE)),
                   "folder_url": folder_url(build_config(user)) if user.google else ""},

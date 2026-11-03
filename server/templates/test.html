@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Tests{% endblock %}
+{% block content %}
+<h1>Izmēģināt kā jauns lietotājs</h1>
+<div class="card prose">
+  <p>Izveido pagaidu testa kontu bez e-studijām un bez Google, un pārslēdz tevi uz to. Lapa izskatīsies tieši tā, kā pirmo reizi to redz jauns cilvēks: pieteikšanās logs, RTU pieteikšanās, Google solis.</p>
+  <p>Tavs konts netiek aiztikts. Kad beigsi (poga lapas augšā vai šeit), testa konts un visi tā dati tiek izdzēsti.</p>
+  <p class="note">Ja testā pieslēgsi Google, tas būs tavs Google konts — kalendārā var parādīties otrs “RTU estudijas” kalendārs. Pēc testa to izdzēs Google Calendar iestatījumos.</p>
+  <form method="post" action="/test">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn primary">{% if active %}Sākt no jauna (jauns testa konts){% else %}Sākt testu{% endif %}</button>
+  </form>
+  {% if active %}
+  <form method="post" action="/test/end">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button class="btn">Beigt testu un atgriezties savā kontā</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

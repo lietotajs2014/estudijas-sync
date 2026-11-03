@@ -25,6 +25,7 @@ from . import google_oauth
 from .crypto import encrypt
 from .db import GoogleLink, MoodleLink, PairingCode, User, get_db, init_db, utcnow
 from .panel import panel_page, router as panel_router
+from .testmode import router as test_router
 from .moodle_link import LinkError, inspect_account, inspect_session, normalize_cookies, parse_token_input
 from .runner import ics_path, load_view, user_dir
 from .settings import settings
@@ -49,6 +50,7 @@ app.add_middleware(SessionMiddleware, secret_key=settings.secret_key or secrets.
                    https_only=settings.secure_cookies)
 app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
 app.include_router(panel_router)
+app.include_router(test_router)
 
 
 @app.middleware("http")
@@ -84,7 +86,7 @@ def current_user(request: Request, db: Session = Depends(get_db)) -> User | None
     if not uid:
         return None
     user = db.get(User, uid)
-    if not user or not settings.email_allowed(user.email):
+    if not user or not user.allowed:
         request.session.clear()
         return None
     return user
@@ -182,7 +184,8 @@ def google_callback(request: Request, state: str = "", code: str = "", error: st
 
     if purpose in ("drive", "google"):
         user = db.get(User, request.session.get("uid") or 0)
-        if not user or user.google_sub != ident.get("sub"):
+        # testa kontam (/test) Google pieslēdz admins ar savu Google kontu
+        if not user or ident.get("sub") not in (user.google_sub, (user.prefs or {}).get("test_of_sub")):
             flash(request, "Google jāpieslēdz ar to pašu Google kontu, ar kuru esi pieteicies lapā.", "err")
             return RedirectResponse("/", 303)
         refresh = tokens.get("refresh_token")
@@ -317,7 +320,7 @@ def api_pair(request: Request, body: dict = Body(...), db: Session = Depends(get
     if not row or row.used or row.expires.replace(tzinfo=row.expires.tzinfo or timezone.utc) < utcnow():
         return JSONResponse({"ok": False, "error": "Kods nav derīgs vai ir beidzies. Izveido jaunu lapā."}, 400)
     user = db.get(User, row.user_id)
-    if not user or not settings.email_allowed(user.email):
+    if not user or not user.allowed:
         return JSONResponse({"ok": False, "error": "Konts nav atrasts."}, 400)
     source = str(body.get("source", ""))[:20] or "app"
     try:
@@ -461,7 +464,7 @@ def calendar_feed(secret: str, download: int = 0, db: Session = Depends(get_db))
     if len(secret) < 20:
         raise HTTPException(404)
     user = db.scalar(select(User).where(User.ics_secret == secret))
-    if not user or not settings.email_allowed(user.email):
+    if not user or not user.allowed:
         raise HTTPException(404)
     p = ics_path(user.id)
     headers = {"Cache-Control": "private, max-age=900"}

@@ -391,3 +391,44 @@ def test_gcal_body_max_5_reminders():
     d = Deadline(uid="a", course_id=1, kind="MD", title="MD1", due=now + timedelta(days=3), url="https://x")
     mins = [o["minutes"] for o in gcal._body(d, {}, cfg, now)["reminders"]["overrides"]]
     assert mins == [5, 10, 60, 120, 1440] and cfg.google_calendar_name == "RTU estudijas"
+
+
+def test_test_mode(client, monkeypatch):
+    """/test: admins pārslēdzas uz pagaidu kontu "kā jauns lietotājs", beigās tas tiek izdzēsts."""
+    from server.settings import settings as st
+    monkeypatch.setattr(st, "admin_emails", ["admins@example.com"])
+
+    _login(client, monkeypatch, sub="g-plain")                         # parasts lietotājs — nav atļauts
+    assert client.get("/test", follow_redirects=False).headers["location"] == "/"
+
+    _login(client, monkeypatch, email="admins@example.com", sub="g-admin")
+    page = client.get("/test")
+    assert page.status_code == 200 and "Sākt testu" in page.text
+    assert client.post("/test", data={}).status_code == 400            # bez CSRF
+    r = client.post("/test", data={"csrf": _csrf(page.text)}, follow_redirects=False)
+    assert r.status_code == 303
+
+    home = client.get("/")
+    tok = re.search(r'const TOKEN = "([^"]+)"', home.text).group(1)
+    s = client.get("/api/status", headers={"X-Token": tok}).json()
+    assert s["test_mode"] is True and s["auth"]["mode"] is None and s["account"]["email"].endswith("@test.invalid")
+    assert not s.get("debug_login")                                    # testa konts nav admins
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.google_sub.like("test:%")).count() == 1
+
+    # otrs tests izdzēš iepriekšējo testa kontu
+    page = client.get("/test")
+    assert "Beigt testu" in page.text
+    client.post("/test", data={"csrf": _csrf(page.text)}, follow_redirects=False)
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.google_sub.like("test:%")).count() == 1
+
+    page = client.get("/test")
+    r = client.post("/test/end", data={"csrf": _csrf(page.text)}, follow_redirects=False)
+    assert r.status_code == 303
+    with SessionLocal() as db:
+        assert db.query(User).filter(User.google_sub.like("test:%")).count() == 0
+    home = client.get("/")
+    tok = re.search(r'const TOKEN = "([^"]+)"', home.text).group(1)
+    s = client.get("/api/status", headers={"X-Token": tok}).json()
+    assert s["test_mode"] is False and s["account"]["email"] == "admins@example.com"
