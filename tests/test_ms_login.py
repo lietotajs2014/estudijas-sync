@@ -194,3 +194,23 @@ def test_ms_login_cancel(fake_site):
     _wait(s, "cancelled")
     s.thread.join(10)
     assert not s.active
+
+
+def test_ms_login_debug_remote(fake_site):
+    """Debug serverī: neko neievada pats, rāda ekrānu; lietotājs raksta caur click/type/key."""
+    from server.ms_login import LoginSession
+
+    before = list(STATE["passwords"])
+    s = LoginSession(9, "janis@edu.rtu.lv", fake_site, lambda *a: "", manual=True)
+    s.start()
+    st = _wait(s, "manual")
+    assert st.get("remote") is True
+    time.sleep(1.5)
+    assert s.snapshot(with_shot=True).get("shot", "").startswith("data:image/jpeg;base64,")
+    time.sleep(2)
+    assert s.snapshot()["step"] == "manual"            # e-pasts netika ievadīts pats — joprojām gaida lietotāju
+    assert STATE["passwords"] == before
+    s.send({"a": "cancel"})
+    _wait(s, "cancelled")
+    s.thread.join(10)
+    assert not s.active and s.shot is None

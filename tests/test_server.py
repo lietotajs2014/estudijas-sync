@@ -314,7 +314,7 @@ def test_panel_ms_login_api(client, monkeypatch):
         def send(self, cmd):
             started.setdefault("cmds", []).append(cmd)
 
-    def fake_start(uid, email, site, cb, manual=False, channel=""):
+    def fake_start(uid, email, site, cb, manual=False, channel="", headed=False):
         started.update(uid=uid, email=email, cb=cb)
         return FakeSession()
 

@@ -1502,7 +1502,7 @@ async function msPoll() {
 function renderMs(st) {
   const shotImg = $("#ms-shot");
   if (shotImg && st.shot) shotImg.src = st.shot;
-  const key = JSON.stringify([st.step, st.message, st.error, st.number, st.options, st.text, msShot, !!st.shot]);
+  const key = JSON.stringify([st.step, st.message, st.error, st.number, st.options, st.text, st.url, msShot, !!st.shot]);
   if (key === msKey) return;
   msKey = key;
   const kids = [], step = st.step;
@@ -1522,9 +1522,12 @@ function renderMs(st) {
     kids.push(el("p", { class: "note", text: "Piesakies ar RTU kontu tāpat kā estudijās. Paroli lapa ieraksta Microsoft logā un nesaglabā." }),
       msField({ id: "ms-email", type: "email", autocomplete: "username", value: email, placeholder: "vards.uzvards@edu.rtu.lv", required: true },
         "RTU e-pasts", v => msStart(v.trim())));
-    if (STATUS.debug_login)   // tikai LOGIN_DEBUG=1, lokāli un adminam: redzams pārlūks, e-pastu/passkey ievada pats
+    if (STATUS.debug_login)   // tikai LOGIN_DEBUG=1 un adminam: visu ievada pats (lokāli īsts logs, serverī ekrānuzņēmums)
       kids.push(el("button", { class: "linkish", type: "button",
-        onclick: () => msStart(($("#ms-email") && $("#ms-email").value || "").trim(), true) }, "Debug: pieteikties pašam atvērtajā logā (passkey)"));
+        onclick: () => msStart(($("#ms-email") && $("#ms-email").value || "").trim(), true) }, STATUS.debug_login === "window" ? "Debug: pieteikties pašam atvērtajā logā (passkey)" : "Debug: pieteikties pašam servera pārlūkā"));
+  } else if (step === "manual" && st.remote) {
+    if (!msShot) msShot = true;                                     // serveris jau sūta ekrānu — tikai rādām
+    kids.push(el("p", { class: "note", text: st.message }), st.url ? el("p", { class: "hint", text: st.url }) : null);
   } else if (step === "manual") {
     kids.push(el("div", { class: "ms-wait" }, el("span", { class: "spin", "aria-hidden": "true" }), el("span", { text: st.message })),
       el("p", { class: "note", text: "Šis logs turpinās pats, kad e-studijas atvērsies." }));

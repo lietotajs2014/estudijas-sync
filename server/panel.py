@@ -113,7 +113,7 @@ def status_dict(user: User) -> dict:
         "output_dir": "serverī (tikai atzīmētie faili)",
         "account": {"email": user.email, "name": user.name},
         "rtu_email": p.get("rtu_email", ""),
-        "debug_login": settings.manual_login_allowed(user.email),
+        "debug_login": (("window" if settings.is_local else "remote") if settings.manual_login_allowed(user.email) else ""),
         "drive": {"connected": has_scope(user, DRIVE_SCOPE), "enabled": bool(user.drive_enabled and has_scope(user, DRIVE_SCOPE)),
                   "folder_url": folder_url(build_config(user)) if user.google else ""},
         "gcal": {"connected": has_scope(user, CALENDAR_SCOPE),
@@ -349,7 +349,8 @@ def ms_start(body: dict = Body(...), user: User = Depends(api_user), db: Session
     manual = bool(body.get("debug")) and settings.manual_login_allowed(user.email)
     try:
         s = registry.start(user.id, email, settings.moodle_site, _on_login_success,
-                           manual=manual, channel=settings.login_browser_channel if manual else "")
+                           manual=manual, headed=manual and settings.is_local,
+                           channel=settings.login_browser_channel if manual and settings.is_local else "")
     except RuntimeError as e:
         return JSONResponse({"ok": False, "error": str(e)}, 429)
     return {"ok": True, **s.snapshot()}

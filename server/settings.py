@@ -25,8 +25,10 @@ class Settings:
     moodle_site: str = field(default_factory=lambda: os.environ.get("MOODLE_SITE", "https://estudijas.rtu.lv").rstrip("/"))
     timezone: str = field(default_factory=lambda: os.environ.get("TZ", "Europe/Riga"))
     schedule_times: list[str] = field(default_factory=lambda: _list("SCHEDULE_TIMES") or ["07:30", "19:30"])
-    # Debug pieteikšanās: atver REDZAMU pārlūku, lai pats ievadītu e-pastu / Windows passkey.
-    # Strādā tikai, kad serveris skrien lokāli (BASE_URL = localhost) un lietotājs ir admins.
+    # Debug pieteikšanās (tikai ADMIN_EMAILS): neko neievada pats, visu dari tu.
+    #   lokāli (BASE_URL = localhost) → atver REDZAMU pārlūka logu (der arī Windows passkey);
+    #   serverī (dev.lodelo.de)       → lapā rāda servera pārlūka ekrānu, uz kura klikšķini un raksti.
+    # Oficiālajā lapā (main) LOGIN_DEBUG neiestata.
     login_debug: bool = field(default_factory=lambda: os.environ.get("LOGIN_DEBUG", "").strip().lower() in ("1", "true", "yes"))
     # "msedge" vai "chrome" = uzstādītais pārlūks (tikai tas var lietot Windows Hello passkey); tukšs = Playwright Chromium
     login_browser_channel: str = field(default_factory=lambda: os.environ.get("LOGIN_BROWSER_CHANNEL", "").strip())
@@ -42,8 +44,8 @@ class Settings:
         return (urlparse(self.base_url).hostname or "") in ("localhost", "127.0.0.1", "::1")
 
     def manual_login_allowed(self, email: str) -> bool:
-        """Redzamais pārlūks: tikai ieslēgts LOGIN_DEBUG, lokāls serveris un admins."""
-        return self.login_debug and self.is_local and (email or "").lower() in self.admin_emails
+        """Debug pieteikšanās: tikai ieslēgts LOGIN_DEBUG un admins."""
+        return self.login_debug and (email or "").lower() in self.admin_emails
 
     def email_allowed(self, email: str) -> bool:
         email = (email or "").lower()

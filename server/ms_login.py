@@ -78,16 +78,17 @@ class LoginSession:
 
     def __init__(self, user_id: int, email: str, site: str,
                  on_success: Callable[[int, list[dict], dict], str],
-                 manual: bool = False, channel: str = ""):
+                 manual: bool = False, channel: str = "", headed: bool = False):
         self.id = secrets.token_urlsafe(16)
         self.user_id, self.email, self.site = user_id, (email or "").strip(), site
         self.on_success = on_success
-        self.manual = manual          # debug: redzams logs, visu ievada lietotājs pats (passkey u.c.)
+        self.manual = manual          # debug: neko neievadām pats, visu dara lietotājs
+        self.headed = manual and headed   # lokāli: īsts logs; serverī: ekrānuzņēmums lapā
         self.channel = channel
         self.q: queue.Queue = queue.Queue()
         self.state: dict = {"step": "starting", "message": "Atveru Microsoft pieteikšanos…"}
         self.shot: bytes | None = None
-        self.want_shot = False
+        self.want_shot = manual and not self.headed
         self.created = self.touched = time.time()
         self.finished: float | None = None
         self._pending: tuple[str, float] = ("", 0.0)
@@ -134,8 +135,8 @@ class LoginSession:
         try:
             with sync_playwright() as pw:
                 kw = {"channel": self.channel} if self.channel else {}
-                browser = pw.chromium.launch(headless=not self.manual, args=["--disable-dev-shm-usage"], **kw)
-                if self.manual:       # īsts logs ar parasto izmēru; UA netiek mainīts, lai passkey / Windows Hello strādā
+                browser = pw.chromium.launch(headless=not self.headed, args=["--disable-dev-shm-usage"], **kw)
+                if self.headed:       # īsts logs ar parasto izmēru; UA netiek mainīts, lai passkey / Windows Hello strādā
                     ctx = browser.new_context(locale="lv-LV", no_viewport=True, timezone_id="Europe/Riga")
                 else:
                     ctx = browser.new_context(user_agent=UA, locale="lv-LV", viewport=VIEWPORT,
@@ -183,8 +184,18 @@ class LoginSession:
                 if is_site_page(url, self.site) and safe_sesskey(page):
                     self._finish(ctx)
                     return
-                if self.manual:       # debug: neko neievadām un nespiežam — lietotājs visu dara atvērtajā logā
-                    self._set(step="manual", message="Pabeidz pieteikšanos atvērtajā pārlūka logā (e-pasts, passkey, apstiprinājums).")
+                if self.manual:       # debug: neko neievadām un nespiežam — lietotājs visu dara pats
+                    if self.headed:
+                        self._set(step="manual", message="Pabeidz pieteikšanos atvērtajā pārlūka logā (e-pasts, passkey, apstiprinājums).")
+                    else:
+                        self._set(step="manual", remote=True, url=url.split("?")[0][:120],
+                                  message="Debug: servera pārlūks. Klikšķini uz ekrāna un raksti zemāk.")
+                        if time.time() - last_shot > 0.8:
+                            try:
+                                self.shot = page.screenshot(type="jpeg", quality=60)
+                                last_shot = time.time()
+                            except Exception:  # noqa: BLE001
+                                pass
                     continue
                 if url.startswith(self.site) and "/login/" in url:
                     sso = page.locator(SEL["moodle_sso"]).first
@@ -361,7 +372,7 @@ class Registry:
                 del self.by_user[uid]
 
     def start(self, user_id: int, email: str, site: str, on_success,
-              manual: bool = False, channel: str = "") -> LoginSession:
+              manual: bool = False, channel: str = "", headed: bool = False) -> LoginSession:
         with self.lock:
             self._cleanup()
             old = self.by_user.get(user_id)
@@ -374,7 +385,7 @@ class Registry:
             if sum(1 for s in self.by_user.values() if s.active) >= MAX_ACTIVE:
                 raise RuntimeError("Serveris pašlaik ir aizņemts ar citām pieteikšanām. Mēģini pēc minūtes.")
             self.starts[user_id] = hits + [now]
-            s = LoginSession(user_id, email, site, on_success, manual=manual, channel=channel)
+            s = LoginSession(user_id, email, site, on_success, manual=manual, channel=channel, headed=headed)
             self.by_user[user_id] = s
         s.start()
         return s

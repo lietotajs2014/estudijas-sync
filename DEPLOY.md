@@ -103,9 +103,37 @@ cd /opt/lodelo && git pull && docker compose --profile nginx up -d --build
 `docker login ghcr.io` (GitHub token ar `read:packages`), tad atjaunināšana ir
 `docker compose pull && docker compose --profile nginx up -d` (vai to dara Watchtower).
 
-**Testa versija blakus:** otrā mapē (`/opt/lodelo-dev`) ar `git checkout dev`, savu `.env`
-(`BASE_URL=https://dev.lodelo.de`, cits `POSTGRES_PASSWORD`/`ENCRYPTION_KEY`), `docker compose -p lodelo-dev ...`
-un otru Cloudflare hostname. nginx variantā tad abiem vajag vienu kopīgu nginx — vieglāk ar tunnel.
+### Abas versijas vienā serverī: main + dev
+
+| | Oficiālā (`main`) | Testa (`dev`) |
+|---|---|---|
+| Mape | `~/estudijas` | `~/estudijas-dev` |
+| Adrese | `estudijas.lodelo.de` | `dev.lodelo.de` |
+| Attēls | `:latest` | `:dev` (`IMAGE=` `.env`) |
+| Debug | izslēgts | `LOGIN_DEBUG=1` (tikai `ADMIN_EMAILS`) |
+| DB, atslēgas, tunelis | savi | savi (atsevišķa DB, cits `ENCRYPTION_KEY`, otrs Cloudflare tunelis) |
+
+Darbs notiek `dev` zarā; `main` atjauno tikai tad, kad dev versija ir pārbaudīta (`git merge dev` → push).
+
+Dev versijas uzlikšana (vienreiz):
+1. Cloudflare → *Zero Trust → Networks → Tunnels → Create tunnel* `lodelo-dev` →
+   *Public hostname* `dev.lodelo.de` → `http://web:8000`. Token → dev `.env`.
+2. Google Cloud → *Clients* → redirect URI `https://dev.lodelo.de/auth/google/callback`.
+3. Serverī:
+   ```bash
+   git clone -b dev https://github.com/lietotajs2014/estudijas-sync.git ~/estudijas-dev
+   cd ~/estudijas-dev && cp ../estudijas/.env .env && nano .env
+   #   BASE_URL=https://dev.lodelo.de
+   #   IMAGE=ghcr.io/lietotajs2014/estudijas-sync:dev
+   #   COMPOSE_PROJECT_NAME=lodelo-dev
+   #   LOGIN_DEBUG=1
+   #   jauni: SECRET_KEY, ENCRYPTION_KEY, POSTGRES_PASSWORD, CLOUDFLARE_TUNNEL_TOKEN
+   docker compose pull && docker compose --profile tunnel up -d
+   ```
+`COMPOSE_PROJECT_NAME` nodala konteinerus, tīklus un datu sējumus — dev nekad neaiztiek oficiālās versijas DB.
+
+Atjaunināšana: `cd ~/estudijas-dev && docker compose pull && docker compose --profile tunnel up -d`
+(oficiālajai to pašu `~/estudijas` mapē).
 
 ## 5. Rezerves kopijas un atjaunošana
 
