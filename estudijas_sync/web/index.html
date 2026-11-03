@@ -1483,9 +1483,9 @@ function msField(attrs, label, onsubmit, btn = "Turpināt") {
   setTimeout(() => inp.focus(), 50);
   return form;
 }
-async function msStart(email) {
+async function msStart(email, debug = false) {
   try {
-    const r = await post("/api/ms/start", { email });
+    const r = await post("/api/ms/start", { email, debug });
     msActive = true; msKey = ""; renderMs(r); msPoll();
   } catch (e) { renderMs({ step: "error", message: e.message }); }
 }
@@ -1522,6 +1522,12 @@ function renderMs(st) {
     kids.push(el("p", { class: "note", text: "Piesakies ar RTU kontu tāpat kā estudijās. Paroli lapa ieraksta Microsoft logā un nesaglabā." }),
       msField({ id: "ms-email", type: "email", autocomplete: "username", value: email, placeholder: "vards.uzvards@edu.rtu.lv", required: true },
         "RTU e-pasts", v => msStart(v.trim())));
+    if (STATUS.debug_login)   // tikai LOGIN_DEBUG=1, lokāli un adminam: redzams pārlūks, e-pastu/passkey ievada pats
+      kids.push(el("button", { class: "linkish", type: "button",
+        onclick: () => msStart(($("#ms-email") && $("#ms-email").value || "").trim(), true) }, "Debug: pieteikties pašam atvērtajā logā (passkey)"));
+  } else if (step === "manual") {
+    kids.push(el("div", { class: "ms-wait" }, el("span", { class: "spin", "aria-hidden": "true" }), el("span", { text: st.message })),
+      el("p", { class: "note", text: "Šis logs turpinās pats, kad e-studijas atvērsies." }));
   } else if (step === "email") {
     if (st.error) kids.push(el("p", { class: "ms-err", text: st.error }));
     kids.push(msField({ id: "ms-email", type: "email", autocomplete: "username", value: st.email || "", required: true },

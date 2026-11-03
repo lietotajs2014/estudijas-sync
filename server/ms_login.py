@@ -77,10 +77,13 @@ class LoginSession:
     """Viena pieteikšanās (savs pavediens, jo Playwright sync API objekti der tikai tajā pavedienā)."""
 
     def __init__(self, user_id: int, email: str, site: str,
-                 on_success: Callable[[int, list[dict], dict], str]):
+                 on_success: Callable[[int, list[dict], dict], str],
+                 manual: bool = False, channel: str = ""):
         self.id = secrets.token_urlsafe(16)
         self.user_id, self.email, self.site = user_id, (email or "").strip(), site
         self.on_success = on_success
+        self.manual = manual          # debug: redzams logs, visu ievada lietotājs pats (passkey u.c.)
+        self.channel = channel
         self.q: queue.Queue = queue.Queue()
         self.state: dict = {"step": "starting", "message": "Atveru Microsoft pieteikšanos…"}
         self.shot: bytes | None = None
@@ -130,9 +133,13 @@ class LoginSession:
         browser = None
         try:
             with sync_playwright() as pw:
-                browser = pw.chromium.launch(headless=True, args=["--disable-dev-shm-usage"])
-                ctx = browser.new_context(user_agent=UA, locale="lv-LV", viewport=VIEWPORT,
-                                          timezone_id="Europe/Riga")
+                kw = {"channel": self.channel} if self.channel else {}
+                browser = pw.chromium.launch(headless=not self.manual, args=["--disable-dev-shm-usage"], **kw)
+                if self.manual:       # īsts logs ar parasto izmēru; UA netiek mainīts, lai passkey / Windows Hello strādā
+                    ctx = browser.new_context(locale="lv-LV", no_viewport=True, timezone_id="Europe/Riga")
+                else:
+                    ctx = browser.new_context(user_agent=UA, locale="lv-LV", viewport=VIEWPORT,
+                                              timezone_id="Europe/Riga")
                 page = ctx.new_page()
                 page.goto(self.site + "/my/", wait_until="domcontentloaded", timeout=60000)
                 self._loop(ctx, page)
@@ -176,6 +183,9 @@ class LoginSession:
                 if is_site_page(url, self.site) and safe_sesskey(page):
                     self._finish(ctx)
                     return
+                if self.manual:       # debug: neko neievadām un nespiežam — lietotājs visu dara atvērtajā logā
+                    self._set(step="manual", message="Pabeidz pieteikšanos atvērtajā pārlūka logā (e-pasts, passkey, apstiprinājums).")
+                    continue
                 if url.startswith(self.site) and "/login/" in url:
                     sso = page.locator(SEL["moodle_sso"]).first
                     if sso.count():
@@ -350,7 +360,8 @@ class Registry:
                     s.send({"a": "cancel"})
                 del self.by_user[uid]
 
-    def start(self, user_id: int, email: str, site: str, on_success) -> LoginSession:
+    def start(self, user_id: int, email: str, site: str, on_success,
+              manual: bool = False, channel: str = "") -> LoginSession:
         with self.lock:
             self._cleanup()
             old = self.by_user.get(user_id)
@@ -363,7 +374,7 @@ class Registry:
             if sum(1 for s in self.by_user.values() if s.active) >= MAX_ACTIVE:
                 raise RuntimeError("Serveris pašlaik ir aizņemts ar citām pieteikšanām. Mēģini pēc minūtes.")
             self.starts[user_id] = hits + [now]
-            s = LoginSession(user_id, email, site, on_success)
+            s = LoginSession(user_id, email, site, on_success, manual=manual, channel=channel)
             self.by_user[user_id] = s
         s.start()
         return s
