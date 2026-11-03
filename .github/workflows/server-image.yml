@@ -35,10 +35,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tagi
+        id: tags
+        # :latest / :dev + nemainīgs :sha-<7> katram būvējumam, lai var atgriezties pie iepriekšējās versijas
+        run: |
+          img=ghcr.io/${{ github.repository }}
+          ch=${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          echo "list=$img:$ch,$img:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name == 'main' && 'latest' || github.ref_name }}
+          tags: ${{ steps.tags.outputs.list }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
