@@ -61,8 +61,17 @@ class User(Base):
                                                          cascade="all, delete-orphan")
 
     @property
+    def is_test(self) -> bool:
+        """Pagaidu testa konts no /test (admins redz lapu kā jauns lietotājs)."""
+        return bool((self.prefs or {}).get("test_of"))
+
+    @property
     def is_admin(self) -> bool:
-        return self.email.lower() in settings.admin_emails
+        return not self.is_test and self.email.lower() in settings.admin_emails
+
+    @property
+    def allowed(self) -> bool:
+        return self.is_test or settings.email_allowed(self.email)
 
 
 class MoodleLink(Base):
