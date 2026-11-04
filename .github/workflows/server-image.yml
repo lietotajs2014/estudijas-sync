@@ -47,5 +47,7 @@ jobs:
           context: .
           push: true
           tags: ${{ steps.tags.outputs.list }}
+          # dev image ar live pieteikšanās logu (Xvfb + noVNC); main bez tā
+          build-args: DEBUG_TOOLS=${{ github.ref_name == 'dev' && '1' || '0' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

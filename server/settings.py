@@ -32,6 +32,10 @@ class Settings:
     login_debug: bool = field(default_factory=lambda: os.environ.get("LOGIN_DEBUG", "").strip().lower() in ("1", "true", "yes"))
     # "msedge" vai "chrome" = uzstādītais pārlūks (tikai tas var lietot Windows Hello passkey); tukšs = Playwright Chromium
     login_browser_channel: str = field(default_factory=lambda: os.environ.get("LOGIN_BROWSER_CHANNEL", "").strip())
+    # Dev serverī: īsts pārlūka logs uz virtuāla ekrāna, redzams caur noVNC (deploy/start-web.sh)
+    login_live: bool = field(default_factory=lambda: os.environ.get("LOGIN_LIVE", "").strip() == "1"
+                             and bool(os.environ.get("DISPLAY")))
+    login_live_url: str = field(default_factory=lambda: os.environ.get("LOGIN_LIVE_URL", "").strip())
 
     @property
     def secure_cookies(self) -> bool:
@@ -42,6 +46,11 @@ class Settings:
         from urllib.parse import urlparse
 
         return (urlparse(self.base_url).hostname or "") in ("localhost", "127.0.0.1", "::1")
+
+    @property
+    def headed_login(self) -> bool:
+        """Vai debug pieteikšanās var atvērt īstu logu: lokāli vai dev serverī ar virtuālo ekrānu."""
+        return self.is_local or self.login_live
 
     def manual_login_allowed(self, email: str) -> bool:
         """Debug pieteikšanās: tikai ieslēgts LOGIN_DEBUG un admins."""

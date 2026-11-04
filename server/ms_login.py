@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 import queue
 import secrets
 import threading
@@ -135,7 +136,10 @@ class LoginSession:
         try:
             with sync_playwright() as pw:
                 kw = {"channel": self.channel} if self.channel else {}
-                browser = pw.chromium.launch(headless=not self.headed, args=["--disable-dev-shm-usage"], **kw)
+                args = ["--disable-dev-shm-usage"]
+                if self.headed and not self.channel:       # serveris ar virtuālo ekrānu: logs pa visu ekrānu
+                    args += ["--window-position=0,0", "--window-size=1280,900"]
+                browser = pw.chromium.launch(headless=not self.headed, args=args, **kw)
                 if self.headed:       # īsts logs ar parasto izmēru; UA netiek mainīts, lai passkey / Windows Hello strādā
                     ctx = browser.new_context(locale="lv-LV", no_viewport=True, timezone_id="Europe/Riga")
                 else:
@@ -185,7 +189,10 @@ class LoginSession:
                     self._finish(ctx)
                     return
                 if self.manual:       # debug: neko neievadām un nespiežam — lietotājs visu dara pats
-                    if self.headed:
+                    if self.headed and os.environ.get("DISPLAY", "").startswith(":99"):
+                        self._set(step="manual", live=True, url=url.split("?")[0][:120],
+                                  message="Live: īstais servera pārlūka logs. Dari visu tajā.")
+                    elif self.headed:
                         self._set(step="manual", message="Pabeidz pieteikšanos atvērtajā pārlūka logā (e-pasts, passkey, apstiprinājums).")
                     else:
                         self._set(step="manual", remote=True, url=url.split("?")[0][:120],

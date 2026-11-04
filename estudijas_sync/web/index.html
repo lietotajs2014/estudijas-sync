@@ -188,6 +188,7 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 dialog#dlg, dialog#msdlg { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 2px solid var(--ink); border-radius: var(--radius-m);
   background: var(--sheet); color: var(--ink); padding: 18px 22px 22px; box-shadow: 0 18px 50px rgba(15, 34, 54, .28); }
 dialog#msdlg { width: min(520px, calc(100vw - 24px)); }
+dialog#msdlg.ms-live { width: min(1340px, calc(100vw - 24px)); }
 dialog#dlg::backdrop, dialog#msdlg::backdrop { background: rgba(15, 34, 54, .45); }
 .dlg-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 #dlg-title { font: 700 26px/1.2 var(--font-head); margin: 10px 0 12px; }
@@ -1479,7 +1480,7 @@ let msTimer = null, msKey = "", msShot = false, msActive = false, msStage = 0, m
 function openMsLogin() {
   const dlg = $("#msdlg");
   if (!dlg.open) dlg.showModal();
-  msShot = false; msKey = ""; msStage = 0;
+  msShot = false; msKey = ""; msStage = 0; dlg.classList.remove("ms-live");
   renderMs({ step: "start" });
 }
 function msInput(cmd) { return post("/api/ms/input", cmd).catch(e => toast(e.message, true)); }
@@ -1509,7 +1510,7 @@ async function msPoll() {
 function renderMs(st) {
   const shotImg = $("#ms-shot");
   if (shotImg && st.shot) shotImg.src = st.shot;
-  const key = JSON.stringify([st.step, st.message, st.error, st.number, st.options, st.text, st.url, msShot, !!st.shot]);
+  const key = JSON.stringify([st.step, st.message, st.error, st.number, st.options, st.text, st.live ? "" : st.url, msShot, !!st.shot]);  // live: iframe nepārlādējam
   if (key === msKey) return;
   msKey = key;
   const kids = [], step = st.step;
@@ -1531,7 +1532,19 @@ function renderMs(st) {
         "RTU e-pasts", v => msStart(v.trim())));
     if (STATUS.debug_login)   // tikai LOGIN_DEBUG=1 un adminam: visu ievada pats (lokāli īsts logs, serverī ekrānuzņēmums)
       kids.push(el("button", { class: "linkish", type: "button",
-        onclick: () => msStart(($("#ms-email") && $("#ms-email").value || "").trim(), true) }, STATUS.debug_login === "window" ? "Debug: pieteikties pašam atvērtajā logā (passkey)" : "Debug: pieteikties pašam servera pārlūkā"));
+        onclick: () => msStart(($("#ms-email") && $("#ms-email").value || "").trim(), true) }, ({ window: "Debug: pieteikties pašam atvērtajā logā (passkey)", live: "Debug: pieteikties pašam (live servera logs)" }[STATUS.debug_login] || "Debug: pieteikties pašam servera pārlūkā")));
+  } else if (step === "manual" && st.live) {
+    $("#msdlg").classList.add("ms-live");                              // plats logs live skatam
+    kids.push(el("p", { class: "note", text: st.message }));
+    if (STATUS.live_url) {
+      let frame = $("#ms-live");
+      if (!frame) frame = el("iframe", { id: "ms-live", src: STATUS.live_url, title: "Servera pārlūka logs",
+        style: "display:block;width:100%;height:min(900px,72vh);border:1px solid var(--line);border-radius:8px;background:#000" });
+      kids.push(frame, el("p", { class: "hint" }, "Ja logs neparādās, ",
+        el("a", { href: STATUS.live_url, target: "_blank", rel: "noopener", text: "atver to jaunā cilnē" }), "."));
+    } else {
+      kids.push(el("p", { class: "ms-err", text: "LOGIN_LIVE_URL nav iestatīts .env — atver noVNC adresi pats." }));
+    }
   } else if (step === "manual" && st.remote) {
     if (!msShot) msShot = true;                                     // serveris jau sūta ekrānu — tikai rādām
     kids.push(el("p", { class: "note", text: st.message }), st.url ? el("p", { class: "hint", text: st.url }) : null);

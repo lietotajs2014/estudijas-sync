@@ -70,7 +70,12 @@ def view_user(request: Request, db: Session = Depends(get_db)) -> User:
 
 def panel_page(request: Request, csrf: str) -> HTMLResponse:
     html = PANEL_HTML.read_text(encoding="utf-8").replace("__TOKEN__", csrf).replace("__MODE__", "web")
-    return HTMLResponse(html, headers={"Content-Security-Policy": PANEL_CSP, "Cache-Control": "no-store"})
+    csp = PANEL_CSP
+    if settings.login_live and settings.login_live_url:      # dev: live pieteikšanās logs iframe
+        from urllib.parse import urlparse
+        u = urlparse(settings.login_live_url)
+        csp += f"; frame-src {u.scheme}://{u.netloc}"
+    return HTMLResponse(html, headers={"Content-Security-Policy": csp, "Cache-Control": "no-store"})
 
 
 def _iso(dt: datetime | None) -> str | None:
@@ -114,7 +119,9 @@ def status_dict(user: User) -> dict:
         "account": {"email": user.email, "name": user.name},
         "test_mode": user.is_test,
         "rtu_email": p.get("rtu_email", ""),
-        "debug_login": (("window" if settings.is_local else "remote") if settings.manual_login_allowed(user.email) else ""),
+        "debug_login": (("window" if settings.is_local else "live" if settings.login_live else "remote")
+                        if settings.manual_login_allowed(user.email) else ""),
+        "live_url": settings.login_live_url if settings.login_live and settings.manual_login_allowed(user.email) else "",
         "drive": {"connected": has_scope(user, DRIVE_SCOPE), "enabled": bool(user.drive_enabled and has_scope(user, DRIVE_SCOPE)),
                   "folder_url": folder_url(build_config(user)) if user.google else ""},
         "gcal": {"connected": has_scope(user, CALENDAR_SCOPE),
@@ -350,7 +357,7 @@ def ms_start(body: dict = Body(...), user: User = Depends(api_user), db: Session
     manual = bool(body.get("debug")) and settings.manual_login_allowed(user.email)
     try:
         s = registry.start(user.id, email, settings.moodle_site, _on_login_success,
-                           manual=manual, headed=manual and settings.is_local,
+                           manual=manual, headed=manual and settings.headed_login,
                            channel=settings.login_browser_channel if manual and settings.is_local else "")
     except RuntimeError as e:
         return JSONResponse({"ok": False, "error": str(e)}, 429)

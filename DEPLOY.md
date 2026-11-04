@@ -130,6 +130,11 @@ Dev versijas uzlikšana (vienreiz):
    #   jauni: SECRET_KEY, ENCRYPTION_KEY, POSTGRES_PASSWORD, CLOUDFLARE_TUNNEL_TOKEN
    docker compose pull && docker compose --profile tunnel up -d
    ```
+**Live pieteikšanās logs (tikai dev):** dev image satur virtuālu ekrānu + noVNC. Ar `LOGIN_LIVE=1`,
+`VNC_PASSWORD` un `LOGIN_LIVE_URL` debug pieteikšanās atver īstu Chromium logu, kas redzams pieteikšanās
+dialogā (un `devlive.lodelo.de`), kur visu dari pats. Cloudflare `lodelo-dev` tunelim: Published application
+`devlive.lodelo.de` → `HTTP web:6080`.
+
 `COMPOSE_PROJECT_NAME` nodala konteinerus, tīklus un datu sējumus — dev nekad neaiztiek oficiālās versijas DB.
 
 Atjaunināšana: `cd ~/estudijas-dev && docker compose pull && docker compose --profile tunnel up -d`
